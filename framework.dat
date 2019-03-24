@@ -1,0 +1,10 @@
+| state-edge         | test                      | func-dispatch        | next-state-edge    |
+|--------------------+---------------------------+----------------------+--------------------|
+|                    |                           |                      |                    |
+| start              | remaining-speculators     | call-next-speculator | producers          |
+| producers          | remaining-producers       | call-next-producer   | consumers          |
+| consumers          | remaining-consumers       | call-next-consumer   | speculation-window |
+| speculation-window | speculation-window-closed | resolve-speculations | trading-window     |
+| trading-window     | trading-window-closed     | resolve-trades       | run-environment    |
+| run-environment    | between-windows           | advance-environment  | done               |
+| done               |                           | wait                 |                    |
