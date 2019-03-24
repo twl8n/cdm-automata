@@ -1,4 +1,15 @@
-#### machine
+#### cdm automata
+
+Tech: SQLite, Clojure
+
+Sketch:
+
+Automata for each of the four marketplace roles plus one to play the role of the environment. Framework to
+support multiples of consumer, producer, and forecaster.
+
+The "framework" can be a fifth automata.
+
+#### todo machine
 
 * demo4 fails, perhaps because will-not-dashboard doesn't exist.
 Maybe if table has any fail during parsing, then exit.
@@ -68,6 +79,20 @@ Workflow state machine ported to Clojure
 ;; turn this into a function, run on the seq of maps that is the state table from read-state-file
 ;;   (map (fn [x] (if (not (= "" (x :test))) (assoc x :testx (eval (read-string (x :test)))) x)) table)
 
+
+#### github mirror push 
+
+When cloning a repo, github docs recommend:
+
+$ git push --mirror https://github.com/exampleuser/new-repository.git
+
+The command above does not use ssh, and will prompt for a userid and password. 
+
+but you almost certainly want:
+
+> git push --mirror git@github.com:exampleuser/new-repository.git
+
+This command will use your nomral github ssh credentials.
 
 #### License
 

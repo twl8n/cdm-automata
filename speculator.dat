@@ -1,0 +1,10 @@
+| state-edge            | test              | func-dispatch      | next-state-edge       |
+|-----------------------+-------------------+--------------------+-----------------------|
+|                       |                   |                    |                       |
+| start                 | need_to_speculate | high-speculator    | make-high-speculation |
+|                       | need-to-speculate | normal-speculator  | make-speculation      |
+|                       | need-to-speculate | low-speculator     | make-low-speculation  |
+| make-high-speculation | do-i-have-funds   | do-high-specuation | done                  |
+| make-speculation      | do-i-have-funds   | do-speculation     | done                  |
+| make-low-speculation  | do-i-have-funds   | do-low-speculation | done                  |
+| done                  |                   | wait               |                       |
