@@ -1,0 +1,12 @@
+| state-edge  | test            | func-dispatch    | next-state-edge |
+|-------------+-----------------+------------------+-----------------|
+|             |                 |                  |                 |
+| start       | do-i-have-funds | price-too-high   | bid-minimal     |
+|             |                 | price-just-right | bid-normal      |
+|             |                 | price-too-low    | bid-maximum     |
+|             |                 |                  |                 |
+| bid-maximum |                 | bid-to-buy       | done            |
+| bid-normal  |                 | bid-to-buy       | done            |
+| bid-minimal |                 | bid-to-buy       | done            |
+|             |                 |                  |                 |
+| done        |                 | wait             |                 |
