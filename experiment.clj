@@ -29,3 +29,10 @@
 
 (do
   (map think [low-brain high-brain]))
+
+;; Seems like we can write a finite automata inline. Not with cond-> as below, but maybe if cont-> that checked the jump value
+;; We need a goto-like behavior.
+(comment (cond-> :start
+           (= :start) (do (println "starting") :wait)
+           (= :debug) (do (println "debugging") :wait)
+           (= :wait) (do (println "waiting"))))
