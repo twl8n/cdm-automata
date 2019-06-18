@@ -32,7 +32,15 @@
 
 ;; Seems like we can write a finite automata inline. Not with cond-> as below, but maybe if cont-> that checked the jump value
 ;; We need a goto-like behavior.
-(comment (cond-> :start
-           (= :start) (do (println "starting") :wait)
-           (= :debug) (do (println "debugging") :wait)
-           (= :wait) (do (println "waiting"))))
+(def state (atom :start))
+(swap! state (fn [xx] :start))
+
+(cond-> (swap! state (fn [xx] :start))
+  (= @state :start) ((fn [xx] (printf "starting %s\n" xx) (swap! state (fn [xx] :wait)) :wait))
+  (= @state :debug) ((do (println "debugging") :wait))
+  (= @state :wait) ((fn [xx] (printf "waiting %s\n" xx ))))
+
+(defn foo [xx] (inc xx))
+
+(cond-> 1
+  true ((fn foo [xx] (inc xx))))
