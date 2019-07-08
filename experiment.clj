@@ -45,21 +45,23 @@
 (cond-> 1
   true ((fn foo [xx] (inc xx))))
 
-(def clearing-price [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103])
+(def clearing-price [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103]) 
 
 ;; amount that buyers and sellers bring to the market
 
 (def fudge-factor -1) ;; -0.1
-(int (Math/ceil (+ trading-volume (* fudge-factor (exp (- clearing-price final-price) 2)))))
+;; (int (Math/ceil (+ trading-volume (* fudge-factor (exp (- clearing-price final-price) 2)))))
 
 ;; (int (Math/ceil (/ 3 2)))
+
+(nth clearing-price 0)
 
 (def spec [{:id 1
             :coef 0.90
             :balance 10000}
            {:id 2
             :coef 1.10
-            :balance 10000}])
+            :balance 1000}])
 
 (defn make-bid [one-spec cp]
   (prn one-spec)
@@ -72,21 +74,18 @@
      (map(fn [xx] (make-bid xx cp)) all-spec))
      clearing-price))
 
-(def foo (run-spec spec))
-
-
-
 ;; https://github.com/clojure/math.numeric-tower
 
 (defn exp [x n]
   (reduce * (repeat n x)))
 
-(defn bid-possible []
-  (let [history [{:price 98 :cost-of-bid 0 :id nil}]
+(defn bid-possible-demo [bid-arg]
+  (let [history [{:price 100 :cost-of-bid 0 :id nil}]
         bid-pool [0] ;; accumulated bid pool
-        bid 111 
-        ficob 1.0 ;; fraction information contribution of bid
         period 1
+        ;; "bid" is delta(?)
+        bid (- bid-arg (nth clearing-price (dec period))
+        ficob 1.0 ;; fraction information contribution of bid
         trading-volume 222
         commission-share 0.009 ;; (aka 0.9 percent)
         systematic-return 1.1
@@ -96,26 +95,33 @@
     cost-of-bid)
   )
 
-(defn resolve-bids [bid spec history]
-  ([] [{:price 98 :cost-of-bid 0 :id nil}])
-  ([history] 
-   ;; save history for next period
-   ;; use history for pay-out to speculators
-   )
-   ([history bid]
-    ;; accumulate history
-    (let [cost-of-bid (bid-possible spec)
-          ;; loop until cost-of-bid is below :balance
-          (if (bid-possible)
-            (conj history {:price 111 :cost-of-bid cost-of-bid :id (:id spec)))
-            (search-possible))
-    )))
+;; ({:id 1, :bid 90} {:id 2, :bid 111})
+(def foo (run-spec spec))
+(def max-bid (apply max (map :bid (first foo))))
+(def min-bid (apply min (map :bid (first foo))))
 
-(defn wrap-bids []
-  (transduce
-   (run-spec %)
-   resolve-bids)
-  spec)
+(map #(bid-possible-demo %) (range min-bid (inc max-bid)))
+
+;; (defn resolve-bids [bid spec history]
+;;   ([] [{:price 98 :cost-of-bid 0 :id nil}])
+;;   ([history] 
+;;    ;; save history for next period
+;;    ;; use history for pay-out to speculators
+;;    )
+;;   ([history bid]
+;;     ;; accumulate history
+;;     (let [cost-of-bid (bid-possible spec)]
+;;           ;; loop until cost-of-bid is below :balance
+;;           (if (bid-possible)
+;;             (conj history {:price 111 :cost-of-bid cost-of-bid :id (:id spec)))
+;;             (search-possible))
+;;     )))
+
+;; (defn wrap-bids []
+;;   (transduce
+;;    (run-spec %)
+;;    resolve-bids)
+;;   spec)
 
 (shuffle (first foo))
 ;; [{:id 2, :bid 111} {:id 1, :bid 90}]
@@ -123,7 +129,7 @@
 [{:id 1 :bid 90}
   {:id 2 :bid 90}]
 
-[{:id 1 :coef 0.9 :balance 1000 :all-future [{ :bid 90} {:bid 95} ...]}
- {:id 2 :coef 0.8 :balance 1010 :all-future [{ :bid 90} {:bid 95} ...]}]
+;; [{:id 1 :coef 0.9 :balance 1000 :all-future [{ :bid 90} {:bid 95} ...]}
+;;  {:id 2 :coef 0.8 :balance 1010 :all-future [{ :bid 90} {:bid 95} ...]}]
  
 
