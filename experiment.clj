@@ -1,6 +1,12 @@
 (ns experiment
   (:require [clojure.string :as string]))
 
+(defn log [xx]
+  (Math/log xx))
+
+(defn abs [xx]
+  (Math/abs xx))
+
 (def low-brain
   (let [prefer-low true]
     {:prefer-low prefer-low
@@ -83,8 +89,8 @@
   (let [history [{:price 100 :cost-of-bid 0 :id nil}]
         bid-pool [0] ;; accumulated bid pool
         period 1
-        ;; "bid" is delta(?)
-        bid (- bid-arg (nth clearing-price (dec period))
+        ;; Uses the built in java log function which won't work with all Clojure number types. Also ln so information is being measured in nats instead of bits
+        bid (abs (log (/ bid-arg (nth clearing-price (dec period)))))
         ficob 1.0 ;; fraction information contribution of bid
         trading-volume 222
         commission-share 0.009 ;; (aka 0.9 percent)
