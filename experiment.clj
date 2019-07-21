@@ -85,28 +85,107 @@
 (defn exp [x n]
   (reduce * (repeat n x)))
 
-(defn bid-possible-demo [bid-arg]
-  (let [history [{:price 100 :cost-of-bid 0 :id nil}]
-        bid-pool [0] ;; accumulated bid pool
-        period 1
-        ;; Uses the built in java log function which won't work with all Clojure number types. Also ln so information is being measured in nats instead of bits
-        bid (abs (log (/ bid-arg (nth clearing-price (dec period)))))
-        ficob 1.0 ;; fraction information contribution of bid
-        trading-volume 222
+(defn between [aa bb cc]
+  (or (and (<= aa bb) (<= bb cc))
+      (and (>= aa bb) (>= bb cc))
+      ))
+  
+(defn info-metric [start end]
+  (abs (log (/ end start))))
+
+(defn total-info [sh bid]
+  (let [start (:start sh)
+        end (:end sh)]
+  (cond
+    (between end start  bid) 0
+    (between start end  bid) (info-metric start end)
+    (between start bid end) (info-metric start bid)
+    )))
+
+;; (total-info {:start 100 :end 111} 107)
+
+(defn test-reduce [local-history intended-bid]
+  (let [end (:end (last local-history))]
+    (reduce + (info-metric intended-bid end) (map #(total-info % intended-bid) local-history))))
+
+(defn bid-info-share [local-history intended-bid ]
+  (let [end (:end (last local-history))
+        bid-info (info-metric intended-bid end)]
+    (if (= intended-bid end)
+      0
+      (/ bid-info (reduce + bid-info (map #(total-info % intended-bid) local-history))))))
+
+(defn bid-possible-demo [bid-arg history]
+  (let [period (inc (:sequence (last history))) ;; Stay with one-based.
+        trading-volume 222 ;; Previous period trading volume, or some invented starting value
         commission-share 0.009 ;; (aka 0.9 percent)
+        info-share (bid-info-share history bid-arg)
         systematic-return 1.1
         rate-of-return (exp 1.1 period)
         cost-of-bid (int (Math/ceil
-                          (/ (+ (apply + bid-pool) (* trading-volume commission-share bid)) (- rate-of-return 1))))] 
-    cost-of-bid)
+                          (/ (+ (apply + (map :pool-balance history)) (* trading-volume commission-share info-share)) (- rate-of-return 1))))] 
+    [bid-arg cost-of-bid])
   )
+
+(apply + (map :pool-balance saved-history))
 
 ;; ({:id 1, :bid 90} {:id 2, :bid 111})
 (def foo (run-spec spec))
 (def max-bid (apply max (map :bid (first foo))))
 (def min-bid (apply min (map :bid (first foo))))
 
+(def max-bid (apply max (map :bid (second foo))))
+(def min-bid (apply min (map :bid (second foo))))
+
+;; Run this on each bid, choose the price, resolve bid, save history, repeat.
+(map #(bid-possible-demo % saved-history) (range min-bid (inc max-bid)))
+
+
+
+;; Special saved-history initial value
+
+(def saved-history [{:id 0
+                     :sequence 0
+                     :start 100 ;; current price this period based on previous speculation
+                     :end 100   ;; ditto
+                     :pool-balance 0}])
+
+(def saved-history [{:id 0
+                     :sequence 0
+                     :start 100 ;; current price
+                     :end 100   ;; also current price
+                     :pool-balance 0}
+                    {:id 1
+                     :sequence 1
+                     :start 100
+                     :end 111
+                     :pool-balance 3}
+                    ])
+
+(def saved-history [{:id 0
+                     :sequence 0
+                     :start 100 ;; current price
+                     :end 100   ;; also current price
+                     :pool-balance 0}
+                    {:id 1
+                     :sequence 1
+                     :start 100
+                     :end 111
+                     :pool-balance 3}
+                    {:id 2
+                     :sequence 2
+                     :start 111
+                     :end 90
+                     :pool-balance 5}])
+;; ([90 3] [91 2] [92 2] [93 2] [94 2] [95 2] [96 1] [97 1] [98 1] [99 1] [100 0] [101 1] [102 1] [103 1] [104 1] [105 1] [106 2] [107 2] [108 2] [109 2] [110 2] [111 3])
+
+
+
+(def max-bid (apply max (map :bid (first foo))))
+(def min-bid (apply min (map :bid (first foo))))
+
 (map #(bid-possible-demo %) (range min-bid (inc max-bid)))
+
 
 ;; (defn resolve-bids [bid spec history]
 ;;   ([] [{:price 98 :cost-of-bid 0 :id nil}])
