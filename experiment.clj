@@ -46,13 +46,6 @@
   (= @state :debug) ((do (println "debugging") :wait))
   (= @state :wait) ((fn [xx] (printf "waiting %s\n" xx ))))
 
-(defn foo [xx] (inc xx))
-
-(cond-> 1
-  true ((fn foo [xx] (inc xx))))
-
-(def clearing-price [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103]) 
-
 ;; amount that buyers and sellers bring to the market
 
 (def fudge-factor -1) ;; -0.1
@@ -60,25 +53,19 @@
 
 ;; (int (Math/ceil (/ 3 2)))
 
-(nth clearing-price 0)
-
-(def spec [{:id 1
-            :coef 0.90
-            :balance 10000}
-           {:id 2
-            :coef 1.10
-            :balance 1000}])
-
 (defn make-bid [one-spec cp]
-  (prn one-spec)
   (let [bid (int (Math/ceil (* (:coef one-spec) cp)))]
     {:id (:id one-spec) :bid bid}))
 
-(defn run-spec [all-spec]
+(defn run-spec-v1 [all-spec clearing-price]
   (map 
    (fn [cp]
      (map(fn [xx] (make-bid xx cp)) all-spec))
-     clearing-price))
+   clearing-price))
+
+(defn run-spec [spec clearing-price]
+  "v2"
+  (map (fn [cp] (make-bid spec cp)) clearing-price))
 
 ;; https://github.com/clojure/math.numeric-tower
 
@@ -127,21 +114,62 @@
     [bid-arg cost-of-bid])
   )
 
-(apply + (map :pool-balance saved-history))
+;; The bots' concept of ideal price. Each bot deviates from this.
+;; Really, each bot needs its own view of future ideal prices.
+(def clearing-price [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103]) 
 
-;; ({:id 1, :bid 90} {:id 2, :bid 111})
-(def foo (run-spec spec))
-(def max-bid (apply max (map :bid (first foo))))
-(def min-bid (apply min (map :bid (first foo))))
+;; How spec bots behave.
+(def spec [{:id 1
+            :coef 0.90
+            :balance 10000}
+           {:id 2
+            :coef 1.15
+            :balance 10000}])
 
-(def max-bid (apply max (map :bid (second foo))))
-(def min-bid (apply min (map :bid (second foo))))
-
-;; Run this on each bid, choose the price, resolve bid, save history, repeat.
-(map #(bid-possible-demo % saved-history) (range min-bid (inc max-bid)))
-
-
-
+(defn runner [cp saved-history spec]
+  ;; (apply + (map :pool-balance saved-history))
+  
+  ;; ({:id 1, :bid 90} {:id 2, :bid 111})
+  (reduce   
+   (fn [period-record my-spec]
+     (prn "using: " my-spec)
+     (let [saved-history (:saved-history period-record)
+           wanted (make-bid my-spec cp)
+           [max-cost-bid min-cost-bid] (if (< cp (:bid wanted))
+                                         [(:bid wanted) cp]
+                                         [cp (:bid wanted)])
+           _ (prn "max: " max-cost-bid " min: " min-cost-bid)
+           ;; Run this on each bid, choose the price, resolve bid, save history, repeat.
+           bid-cost (map #(bid-possible-demo % saved-history) (range min-cost-bid (inc max-cost-bid)))
+           _ (prn "wanted: " wanted "bid-cost: " bid-cost)
+           ;; choose price
+           [actual-bid actual-cost] (loop [[bid cost] (first bid-cost)]
+                                      (if (> (:balance my-spec) cost)
+                                        [bid cost]
+                                        (recur (rest bid-cost))))]
+       ;; resolve bid
+       ;; return updated save history, and new spec
+       {:spec (conj (:spec period-record)
+                    (assoc my-spec :balance (- (:balance my-spec) actual-cost)))
+        :saved-history 
+        (conj saved-history
+              {:id (:id my-spec)
+               :sequence (inc (:sequence (last saved-history)))
+               :start (:end (last saved-history))
+               :end actual-bid
+               :pool-balance (+ actual-cost (:pool-balance (last saved-history)))})}))
+   {:saved-history saved-history :spec []}
+   spec))
+  
+(comment
+  ;; reduce complex value
+  (reduce
+   (fn [yy xx] (prn xx (:spec yy))
+     {:spec (conj (:spec yy) {:id xx}) :balance (+ xx  (:balance yy))})
+   {:spec [] :balance 10}
+   [1 2 1 4])
+  )
+  
 ;; Special saved-history initial value
 
 (def saved-history [{:id 0
@@ -150,42 +178,36 @@
                      :end 100   ;; ditto
                      :pool-balance 0}])
 
-(def saved-history [{:id 0
-                     :sequence 0
-                     :start 100 ;; current price
-                     :end 100   ;; also current price
-                     :pool-balance 0}
-                    {:id 1
-                     :sequence 1
-                     :start 100
-                     :end 111
-                     :pool-balance 3}
-                    ])
+(def ex-saved-history-2 [{:id 0
+                          :sequence 0
+                          :start 100 ;; current price
+                          :end 100   ;; also current price
+                          :pool-balance 0}
+                         {:id 1
+                          :sequence 1
+                          :start 100
+                          :end 90
+                          :pool-balance 3}
+                         ])
+;; (runner ex-saved-history-2)
 
-(def saved-history [{:id 0
-                     :sequence 0
-                     :start 100 ;; current price
-                     :end 100   ;; also current price
-                     :pool-balance 0}
-                    {:id 1
-                     :sequence 1
-                     :start 100
-                     :end 111
-                     :pool-balance 3}
-                    {:id 2
-                     :sequence 2
-                     :start 111
-                     :end 90
-                     :pool-balance 5}])
+(def ex-saved-history-3 [{:id 0
+                          :sequence 0
+                          :start 100 ;; current price
+                          :end 100   ;; also current price
+                          :pool-balance 0}
+                         {:id 1
+                          :sequence 1
+                          :start 100
+                          :end 90
+                          :pool-balance 3}
+                         {:id 2
+                          :sequence 2
+                          :start 90
+                          :end 111
+                          :pool-balance 5}])
+
 ;; ([90 3] [91 2] [92 2] [93 2] [94 2] [95 2] [96 1] [97 1] [98 1] [99 1] [100 0] [101 1] [102 1] [103 1] [104 1] [105 1] [106 2] [107 2] [108 2] [109 2] [110 2] [111 3])
-
-
-
-(def max-bid (apply max (map :bid (first foo))))
-(def min-bid (apply min (map :bid (first foo))))
-
-(map #(bid-possible-demo %) (range min-bid (inc max-bid)))
-
 
 ;; (defn resolve-bids [bid spec history]
 ;;   ([] [{:price 98 :cost-of-bid 0 :id nil}])
@@ -208,7 +230,6 @@
 ;;    resolve-bids)
 ;;   spec)
 
-(shuffle (first foo))
 ;; [{:id 2, :bid 111} {:id 1, :bid 90}]
 
 [{:id 1 :bid 90}
