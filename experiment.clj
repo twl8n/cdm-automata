@@ -93,7 +93,10 @@
     (printf "ti: %s start: %s end: %s bid %s\n" ti start end bid)
     ti))
 
-;; (total-info {:start 100 :end 111} 107)
+;; Is there really zero info when the bid price is moving the price backwards?
+;; (total-info {:start 80 :end 100} 79) => 0
+;; (total-info {:start 100 :end 80} 107) => 0
+;; (total-info {:start 100 :end 111} 107) => 0.06765864847381486
 
 (defn test-reduce [local-history intended-bid]
   (let [end (:end (last local-history))]
