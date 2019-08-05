@@ -107,12 +107,12 @@
         trading-volume 222 ;; Previous period trading volume, or some invented starting value
         commission-share 0.009 ;; (aka 0.9 percent)
         info-share (bid-info-share history bid-arg)
+        _ (printf "info-share: %s bid-arg: %s\n" info-share bid-arg)
         systematic-return 1.1
         rate-of-return (exp 1.1 period)
         cost-of-bid (int (Math/ceil
                           (/ (+ (apply + (map :pool-balance history)) (* trading-volume commission-share info-share)) (- rate-of-return 1))))] 
-    [bid-arg cost-of-bid])
-  )
+    [bid-arg cost-of-bid]))
 
 ;; The bots' concept of ideal price. Each bot deviates from this.
 ;; Really, each bot needs its own view of future ideal prices.
@@ -120,7 +120,7 @@
 
 ;; How spec bots behave.
 (def spec [{:id 1
-            :coef 0.90
+            :coef 0.80
             :balance 10000}
            {:id 2
             :coef 1.28
@@ -139,10 +139,9 @@
            bid-range  (if (< cp bid-wanted)
                         (range bid-wanted cp -1)
                         (range bid-wanted cp 1))
-           _ (prn "br: " bid-range)
            ;; Run this on each bid, choose the price, resolve bid, save history, repeat.
            bid-cost (map #(bid-possible-demo % saved-history) bid-range)
-           _ (prn "wanted: " wanted "bid-cost: " bid-cost)
+           _ (printf "bid-wanted: %s bid-cost %s\n" bid-wanted (with-out-str (prn bid-cost)))
            ;; choose price
            [actual-bid actual-cost] (loop [[bid cost] (first bid-cost)]
                                       (if (> (:balance my-spec) cost)
