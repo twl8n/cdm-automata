@@ -82,12 +82,16 @@
 
 (defn total-info [sh bid]
   (let [start (:start sh)
-        end (:end sh)]
-  (cond
-    (between end start  bid) 0
-    (between start end  bid) (info-metric start end)
-    (between start bid end) (info-metric start bid)
-    )))
+        end (:end sh)
+        ti (cond
+             (between end start  bid) (do
+                                        (prn "returning zero")
+                                        0)
+             (between start end  bid) (info-metric start end)
+             (between start bid end) (info-metric start bid)
+             )]
+    (printf "ti: %s start: %s end: %s bid %s\n" ti start end bid)
+    ti))
 
 ;; (total-info {:start 100 :end 111} 107)
 
@@ -97,10 +101,13 @@
 
 (defn bid-info-share [local-history intended-bid ]
   (let [end (:end (last local-history))
-        bid-info (info-metric intended-bid end)]
+        bid-info (info-metric intended-bid end)
+        info-seq (map #(total-info % intended-bid) local-history)]
+    ;; (printf "lh: %s\n" (with-out-str (prn local-history)))
+    (printf "info-seq: %s\n" (with-out-str (prn info-seq)))
     (if (= intended-bid end)
       0
-      (/ bid-info (reduce + bid-info (map #(total-info % intended-bid) local-history))))))
+      (/ bid-info (reduce + bid-info info-seq)))))
 
 (defn bid-possible-demo [bid-arg history]
   (let [period (inc (:sequence (last history))) ;; Stay with one-based.
