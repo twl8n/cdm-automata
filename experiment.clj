@@ -123,7 +123,7 @@
             :coef 0.90
             :balance 10000}
            {:id 2
-            :coef 1.15
+            :coef 1.28
             :balance 10000}])
 
 (defn runner [cp saved-history spec]
@@ -135,12 +135,13 @@
      (prn "using: " my-spec)
      (let [saved-history (:saved-history period-record)
            wanted (make-bid my-spec cp)
-           [max-cost-bid min-cost-bid] (if (< cp (:bid wanted))
-                                         [(:bid wanted) cp]
-                                         [cp (:bid wanted)])
-           _ (prn "max: " max-cost-bid " min: " min-cost-bid)
+           bid-wanted (:bid wanted)
+           bid-range  (if (< cp bid-wanted)
+                        (range bid-wanted cp -1)
+                        (range bid-wanted cp 1))
+           _ (prn "br: " bid-range)
            ;; Run this on each bid, choose the price, resolve bid, save history, repeat.
-           bid-cost (map #(bid-possible-demo % saved-history) (range min-cost-bid (inc max-cost-bid)))
+           bid-cost (map #(bid-possible-demo % saved-history) bid-range)
            _ (prn "wanted: " wanted "bid-cost: " bid-cost)
            ;; choose price
            [actual-bid actual-cost] (loop [[bid cost] (first bid-cost)]
@@ -156,12 +157,17 @@
               {:id (:id my-spec)
                :sequence (inc (:sequence (last saved-history)))
                :start (:end (last saved-history))
+               :actual-cost actual-cost
                :end actual-bid
                :pool-balance (+ actual-cost (:pool-balance (last saved-history)))})}))
    {:saved-history saved-history :spec []}
    spec))
+
   
 (comment
+  (require '[clojure.pprint :as pp])
+  (pp/pprint (runner (nth clearing-price 0) saved-history spec))
+
   ;; reduce complex value
   (reduce
    (fn [yy xx] (prn xx (:spec yy))
