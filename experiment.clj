@@ -187,9 +187,14 @@
   
 ;; Special saved-history initial value
 
-(def saved-history [{:id 0
-                     :sequence 0
+(def saved-history [{:id -1
+                     :sequence -1
                      :start 100 ;; current price this period based on previous speculation
+                     :end 101   ;; ditto
+                     :pool-balance 0}
+                    {:id 0
+                     :sequence 0
+                     :start 101 ;; current price this period based on previous speculation
                      :end 100   ;; ditto
                      :pool-balance 0}])
 
