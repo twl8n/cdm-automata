@@ -9,6 +9,20 @@ support multiples of consumer, producer, and forecaster.
 
 The "framework" can be a fifth automata.
 
+
+#### Usage
+
+This software uses Leiningen. As far as I can remember, installing Leiningen also installs Clojure, so there
+is only a single dependency to get running.
+
+https://leiningen.org/#install
+
+```bash
+lein run
+```
+
+The source file is src/machine/experiment.clj. The entry point is defn -main.
+
 #### todo machine
 
 * demo4 fails, perhaps because will-not-dashboard doesn't exist.
