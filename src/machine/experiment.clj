@@ -96,11 +96,6 @@
     ;; (do (printf "ti: %s start: %s end: %s bid %s\n" ti start end bid) (flush))
     ti))
 
-;; Is there really zero info when the bid price is moving the price backwards?
-;; (total-info {:start 80 :end 100} 79) => 0
-;; (total-info {:start 100 :end 80} 107) => 0
-;; (total-info {:start 100 :end 111} 107) => 0.06765864847381486
-
 (defn test-reduce [local-history intended-bid]
   (let [end (:end (last local-history))]
     (reduce + (info-metric intended-bid end) (map #(total-info % intended-bid) local-history))))
@@ -114,9 +109,11 @@
       0
       (/ bid-info (reduce + bid-info info-seq)))))
 
+(def const-trading-volume 22200)
+
 (defn bid-possible-demo [bid-arg history]
   (let [period (inc (:sequence (last history))) ;; Stay with one-based.
-        trading-volume 222 ;; Previous period trading volume, or some invented starting value
+        trading-volume const-trading-volume ;; Previous period trading volume, or some invented starting value
         commission-share 0.009 ;; (aka 0.9 percent)
         info-share (bid-info-share history bid-arg)
         ;; _ (do (printf "info-share: %s bid-arg: %s\n" info-share bid-arg) (flush))
@@ -128,15 +125,30 @@
 
 ;; The bots' concept of ideal price. Each bot deviates from this.
 ;; Really, each bot needs its own view of future ideal prices.
-(def ideal-clearing-price [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103]) 
+
+;; Price in cents, in the range of $10K
+(def ideal-clearing-price
+  (map #(* 10000 %)
+       [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103])) 
+
+(defn calc-trading-volume [final-clearing ideal-clearing ideal-volume]
+  (let [magic-number 10 
+        temp (- final-clearing ideal-clearing)]
+        (- ideal-volume (* magic-number (* temp temp)))))
+
+(comment
+  (calc-trading-volume 80 100 22200)
+  )
+
+
 
 ;; How spec bots behave.
 (def spec [{:id 1
             :coef 0.80
-            :balance 10000}
+            :balance 10000000}
            {:id 2
             :coef 1.28
-            :balance 10000}])
+            :balance 10000000}])
 
 ;; Example of things that bots want to know in order to bid.
 (def single-spec {:bid "this speculator bid, int"
@@ -149,18 +161,19 @@
   (flush)
   (let [saved-history (:saved-history period-record)
         cp (:end (last saved-history))
-        bid-wanted (:bid my-spec)
+        bid-wanted (* (:bid my-spec) cp)
         bid-range  (if (< cp bid-wanted)
-                     (range bid-wanted cp -1)
-                     (range bid-wanted cp 1))
+                     (range bid-wanted cp -100000)
+                     (range bid-wanted cp 100000))
         ;; Run this on each bid, choose the price, resolve bid, save history, repeat.
         bid-cost (mapv #(bid-possible-demo % saved-history) bid-range)
-        _ (do (printf "bid-wanted: %s bid-cost %s\n" bid-wanted (with-out-str (prn bid-cost))) (flush))
-        ;; choose price
-        [actual-bid actual-cost] (loop [[bid cost] (first bid-cost)]
-                                   (if (> (:balance my-spec) cost)
-                                     [bid cost]
-                                     (recur (rest bid-cost))))]
+        _ (do (printf "bid-wanted: %s\n" bid-wanted) (flush))
+        ;; choose price, crawl actual-cost unil reaching a bid I can afford.
+        [actual-bid actual-cost] (loop [my-bid-cost bid-cost]
+                                   (let [[bid cost] (first my-bid-cost)]
+                                     (if (> (:balance my-spec) cost)
+                                       [bid cost]
+                                       (recur (rest my-bid-cost)))))]
     ;; resolve bid
     ;; return updated save history, and new spec
     {:spec (conj (:spec period-record)
@@ -174,15 +187,15 @@
             :end actual-bid
             :pool-balance (+ actual-cost (:pool-balance (last saved-history)))})}))
 
-  ;; (apply + (map :pool-balance saved-history))
-  ;; ({:id 1, :bid 90} {:id 2, :bid 111})
-
 
 (defn runner [cp saved-history spec]
-  (reduce   
-   single-bid-reducer
-   {:saved-history saved-history :spec []}
-   (map (fn [mspec] (assoc mspec :bid (:bid (make-bid mspec 100)))) spec)))
+  (let [end-price (:end (last saved-history))
+        spec-bid-vector (map (fn [mspec] (assoc mspec :bid (:bid (make-bid mspec end-price)))) spec)]
+    (prn "End price: " end-price spec-bid-vector)
+    (reduce   
+     single-bid-reducer
+     {:saved-history saved-history :spec []}
+     spec-bid-vector)))
    
   
 (comment
@@ -199,16 +212,16 @@
 
 (def saved-history [{:id -1
                      :sequence -1
-                     :start 100 ;; current price this period based on previous speculation
-                     :end 101   ;; ditto
+                     :start 1000000 ;; current price this period based on previous speculation
+                     :end   1000001   ;; ditto
                      :pool-balance 0}
                     {:id 0
                      :sequence 0
-                     :start 101 ;; current price this period based on previous speculation
-                     :end 100   ;; ditto
+                     :start 1000001 ;; current price this period based on previous speculation
+                     :end   1000000 ;; ditto
                      :pool-balance 0}])
 
 
 
 (defn -main []
-  (pp/pprint (runner (nth clearing-price 0) saved-history spec)))
+  (pp/pprint (runner (nth ideal-clearing-price 0) saved-history spec)))
