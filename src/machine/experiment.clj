@@ -111,7 +111,7 @@
 
 (def const-trading-volume 22200)
 
-(defn bid-possible-demo [bid-arg history]
+(defn bid-possible-demo[bid-arg history]
   (let [period (inc (:sequence (last history))) ;; Stay with one-based.
         trading-volume const-trading-volume ;; Previous period trading volume, or some invented starting value
         commission-share 0.009 ;; (aka 0.9 percent)
@@ -156,18 +156,61 @@
                   :coef "coef from spec, float"
                   :balance "balance from spec, int"})
 
+
+(defn found-example-binary-search
+  [coll ^long coll-size  target]
+  (let [cnt (dec coll-size)]
+    (loop [low-idx 0 high-idx cnt]
+      (if (> low-idx high-idx)
+        nil
+        (let [mid-idx (quot (+ low-idx high-idx) 2) mid-val (coll mid-idx)]
+          (cond
+            (= mid-val target) mid-idx
+            (< mid-val target) (recur (inc mid-idx) high-idx)
+            (> mid-val target) (recur low-idx (dec mid-idx))))))))
+(binary-search [1 2 4 5 6 7 8] 8 5)
+
+(defn binary-search
+  [min max target]
+  )
+
+(comment 
+  ;; Binary search over the range from current price as known to the system to my bid price
+  ;; Current price is the most recent :end price, which changes in the local history as bids are resolved.
+  ;; We start with (:end (last saved-history)), 1000000
+  ;; The first bidder wants 0.8 which is 800000. We need to binary search from 1000000 back to 800000.
+  ;; bid-range: (1280000 1180000 1080000 980000 880000)
+  ;; Change the number to have fewer zeros, then use a multipler to test efficiency of the algo.
+  (make-bid (first spec) (:end (last saved-history))) ;; {:id 1, :bid 800000}
+  (first spec) ;; {:id 1, :coef 0.8, :balance 10000000}
+  (merge {:id 1, :coef 0.8, :balance 10000000} {:id 1, :bid 800000})
+  (map (fn [mspec] (assoc mspec :bid (:bid (make-bid mspec (:end (last saved-history)))))) spec)
+  (let [end-price (:end (last saved-history))
+        intended-bid (map (fn [mspec] (merge mspec (make-bid mspec end-price))) spec)]
+    (bid-possible-demo (:bid (first intended-bid)) saved-history))
+  ;; end comment
+  )
+
+
 (defn single-bid-reducer [period-record my-spec]
   (printf "using: %s\n" my-spec)
   (flush)
   (let [saved-history (:saved-history period-record)
+        _ (do (printf "local sh: %s\n" saved-history) (flush))
         cp (:end (last saved-history))
-        bid-wanted (* (:bid my-spec) cp)
+        _ (do (printf "cp: %s\n" cp) (flush))
+        bid-wanted (:bid my-spec) ;; Some old stuff: (* (:bid my-spec) cp)
+        _ (do (printf "bid-wanted: %s for bid %s on %s\n" bid-wanted (:bid my-spec) cp) (flush))
         bid-range  (if (< cp bid-wanted)
                      (range bid-wanted cp -100000)
                      (range bid-wanted cp 100000))
+        _ (do (printf "bid-range: %s\n" bid-range) (flush))
         ;; Run this on each bid, choose the price, resolve bid, save history, repeat.
+        ;; bid-cost is [[bid cost] ...]
         bid-cost (mapv #(bid-possible-demo % saved-history) bid-range)
+        _ (def g-bid-cost bid-cost)
         _ (do (printf "bid-wanted: %s\n" bid-wanted) (flush))
+        ;; Replace this with a binary search. This works, but for large ranges it is very slow.
         ;; choose price, crawl actual-cost unil reaching a bid I can afford.
         [actual-bid actual-cost] (loop [my-bid-cost bid-cost]
                                    (let [[bid cost] (first my-bid-cost)]
@@ -220,7 +263,6 @@
                      :start 1000001 ;; current price this period based on previous speculation
                      :end   1000000 ;; ditto
                      :pool-balance 0}])
-
 
 
 (defn -main []
