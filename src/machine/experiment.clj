@@ -335,7 +335,7 @@
   (if (or (> 1 try-bid) (> iter 20))
     nil
     (let [cost (check-bid saved-history try-bid balance)
-          [new-try new-max] (cond (> cost balance) (do
+          [new-try new-dest] (cond (> cost balance) (do
                                                      (println "cost >>> balance cost:" cost "try-bid:" try-bid)
                                                      [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
                                   (< cost balance) (do
@@ -343,7 +343,7 @@
                                                      [(- try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
           best-bid (if (= new-try try-bid)
                      (if (> cost balance) prev-bid try-bid)
-                     (find-demo new-try new-max try-bid balance saved-history (inc iter)))]
+                     (find-demo new-try new-dest try-bid balance saved-history (inc iter)))]
       best-bid)))
 
 ;; (fnx '(1))
