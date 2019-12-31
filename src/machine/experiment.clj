@@ -319,31 +319,40 @@
 
 (defn round-up [nn] (Math/floor (- nn 0.5)))
   
-;; (find-demo 980.0 (:end (last saved-history)) 949.0 saved-history 0)
-;; (find-demo 1020.0 (:end (last saved-history)) 949.0 saved-history 0)
+(defn udir [origin dest]
+  "unit direction, +1 up, -1 down"
+  (let [delt (- origin dest)]
+    (/ (abs delt) delt)))
+
+;; (find-demo 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
+;; (find-demo 980.0 (:end (last saved-history)) 980.0 977.0 saved-history 0)
+;; (find-demo 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
 (defn find-demo
-  "Only works for lowering price. Needs directionality fix."
-  [try-bid max-bid balance saved-history iter]
-  (println "======== trying:" try-bid "max:" max-bid)
+  "Only works for lowering price. Starting to add directionality fix. 
+  When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
+  [try-bid dest-bid prev-bid balance saved-history iter]
+  (println "======== trying:" try-bid "dest:" dest-bid "direction:" (udir try-bid dest-bid) )
   (if (or (> 1 try-bid) (> iter 20))
     nil
-    (let [cost (check-bid saved-history try-bid balance)]
-      (cond (> cost balance) (do
-                               (let [new-try (+ (round-up (/ (- max-bid try-bid) 2)) try-bid)]
-                               (println ">>> cost balance cost:" cost "try-bid:" try-bid "new-try:" new-try)
-                                 (if (= new-try try-bid)
-                                   (do (println ">>>> new-try is equal") max-bid)
-                                   (find-demo new-try max-bid balance saved-history (inc iter)))))
-            (and (< cost balance) (= try-bid max-bid)) (do
-                                                         (println "cost:" cost "try-bid:" try-bid)
-                                                         try-bid)
-            (< cost balance) (if (< try-bid max-bid)
-                               (do
-                                 (println "<<< cost balance cost:" cost "try-bid:" try-bid)
-                                 (let [new-try (- try-bid (round-up (/ (- max-bid try-bid) 2)))]
-                                   (if (= new-try try-bid)
-                                     (do (println "<<<<< new-try is equal") try-bid)
-                                     (find-demo new-try try-bid balance saved-history (inc iter)))))
-                               (do (println "<<< try gt max") max-bid))
-            ))))
+    (let [cost (check-bid saved-history try-bid balance)
+          [new-try new-max] (cond (> cost balance) (do
+                                                     (println "cost >>> balance cost:" cost "try-bid:" try-bid)
+                                                     [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
+                                  (< cost balance) (do
+                                                     (println "cost <<< balance cost:" cost "try-bid:" try-bid)
+                                                     [(- try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
+          best-bid (if (= new-try try-bid)
+                     (if (> cost balance) prev-bid try-bid)
+                     (find-demo new-try new-max try-bid balance saved-history (inc iter)))]
+      best-bid)))
+
+;; (fnx '(1))
+(defn fnx [arg]
+  (println arg)
+  (let [curr (first arg)]
+    (if (= 5 curr)
+      (nth arg 1)
+      (fnx (conj arg (inc curr))))))
+
+
         
