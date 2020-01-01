@@ -317,22 +317,28 @@
 (defn -main []
   (pp/pprint (runner (nth ideal-clearing-price 0) saved-history spec)))
 
-(defn round-up [nn] (Math/floor (- nn 0.5)))
+(defn round-up [nn] (if (pos? nn)
+                      (Math/floor (+ nn 0.5))
+                      (Math/ceil (+ nn -0.5))))
   
 (defn udir [origin dest]
-  "unit direction, +1 up, -1 down"
-  (let [delt (- origin dest)]
-    (/ (abs delt) delt)))
+  "unit direction, +1 up, -1 down. origin > dest is +1. Origin is current price. Dest is bid price."
+    (if (= origin dest)
+      0
+      (let [delt (- origin dest)]
+        (/ (abs delt) delt))))
 
 ;; (find-demo 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
 ;; (find-demo 980.0 (:end (last saved-history)) 980.0 977.0 saved-history 0)
 ;; (find-demo 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
+;; (find-demo 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
 (defn find-demo
-  "Only works for lowering price. Starting to add directionality fix. 
-  When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
+  "When cost exceeds balance, try a new bid closer to the dest.
+When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
+When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
   [try-bid dest-bid prev-bid balance saved-history iter]
-  (println "======== trying:" try-bid "dest:" dest-bid "direction:" (udir try-bid dest-bid) )
-  (if (or (> 1 try-bid) (> iter 20))
+  (println "======== trying:" try-bid "dest:" dest-bid )
+  (if (or (> 1 try-bid) (> iter 25))
     nil
     (let [cost (check-bid saved-history try-bid balance)
           [new-try new-dest] (cond (> cost balance) (do
