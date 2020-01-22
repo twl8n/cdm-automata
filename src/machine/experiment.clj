@@ -203,7 +203,7 @@
         _ (do (printf "local sh: %s\n" saved-history) (flush))
         cp (:end (last saved-history))
         _ (do (printf "cp: %s\n" cp) (flush))
-        bid-wanted (:bid my-spec) ;; Some old stuff: (* (:bid my-spec) cp)
+        bid-wanted (:bid my-spec) 
         _ (do (printf "bid-wanted: %s for bid %s on %s\n" bid-wanted (:bid my-spec) cp) (flush))
         bid-range  (if (< cp bid-wanted)
                      (range bid-wanted cp -100000)
@@ -220,25 +220,20 @@
         bid-cost (mapv #(bid-possible-demo % saved-history current-history) bid-range)
         _ (def g-bid-cost bid-cost)
         _ (do (printf "bid-wanted: %s\n" bid-wanted) (flush))
-        ;; Replace this with a binary search. This works, but for large ranges it is very slow.
-        ;; choose price, crawl actual-cost unil reaching a bid I can afford.
-        [actual-bid actual-cost] (loop [my-bid-cost bid-cost]
-                                   (let [[bid cost] (first my-bid-cost)]
-                                     (if (> (:balance my-spec) cost)
-                                       [bid cost]
-                                       (recur (rest my-bid-cost)))))]
+        ;; (find-bid-cost 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
+        bid-cost (find-bid-cost bid-wanted cp bid-wanted (:balance my-spec) saved-history 0)]
     ;; resolve bid
     ;; return updated save history, and new spec
     {:spec (conj (:spec period-record)
-                 (assoc my-spec :balance (- (:balance my-spec) actual-cost)))
+                 (assoc my-spec :balance (- (:balance my-spec) (:cost bid-cost))))
      :saved-history 
      (conj saved-history
            {:id (:id my-spec)
             :sequence (inc (:sequence (last saved-history)))
             :start (:end (last saved-history))
-            :actual-cost actual-cost
-            :end actual-bid
-            :pool-balance (+ actual-cost (:pool-balance (last saved-history)))})}))
+            :actual-cost (:cost bid-cost)
+            :end (:bid bid-cost)
+            :pool-balance (+ (:cost bid-cost) (:pool-balance (last saved-history)))})}))
 
 
 (defn runner [cp saved-history spec]
@@ -328,11 +323,29 @@
       (let [delt (- origin dest)]
         (/ (abs delt) delt))))
 
-;; (find-demo 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
-;; (find-demo 980.0 (:end (last saved-history)) 980.0 977.0 saved-history 0)
-;; (find-demo 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
-;; (find-demo 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
-(defn find-demo
+(def sh3
+  [{:id -1, :sequence -1, :start 1000, :end 1001, :pool-balance 0}
+   {:id 0, :sequence 0, :start 1001, :end 1000, :pool-balance 0}
+   {:id 1,
+    :sequence 1,
+    :start 1000,
+    :actual-cost 976,
+    :end 995.0,
+    :pool-balance 976}])
+;; Cost to move to 994 is 4728
+;; Cost to move to 995 is 4648
+
+(comment
+  (find-bid-cost 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
+  (find-bid-cost 980.0 (:end (last saved-history)) 980.0 977.0 saved-history 0)
+  (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
+  (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
+
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 977.0 sh3 0)
+  (find-bid-cost 996.0 (:end (last sh3)) 996.0 977.0 sh3 0)
+  (find-bid-cost 992.0 (:end (last sh3)) 992.0 977.0 sh3 0)
+  )
+(defn find-bid-cost
   "When cost exceeds balance, try a new bid closer to the dest.
 When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
 When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
@@ -342,15 +355,17 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
     nil
     (let [cost (check-bid saved-history try-bid balance)
           [new-try new-dest] (cond (> cost balance) (do
-                                                     (println "cost >>> balance cost:" cost "try-bid:" try-bid)
-                                                     [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
-                                  (< cost balance) (do
-                                                     (println "cost <<< balance cost:" cost "try-bid:" try-bid)
-                                                     [(- try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
-          best-bid (if (= new-try try-bid)
-                     (if (> cost balance) prev-bid try-bid)
-                     (find-demo new-try new-dest try-bid balance saved-history (inc iter)))]
-      best-bid)))
+                                                      (println "cost >>> balance cost:" cost "try-bid:" try-bid)
+                                                      [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
+                                   (< cost balance) (do
+                                                      (println "cost <<< balance cost:" cost "try-bid:" try-bid)
+                                                      [(- try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
+          bid-cost (if (= new-try try-bid)
+                     (if (> cost balance)
+                       {:bid prev-bid :cost cost :succeed false}
+                       {:bid try-bid :cost cost :succeed true})
+                     (find-bid-cost new-try new-dest try-bid balance saved-history (inc iter)))]
+      bid-cost)))
 
 ;; (fnx '(1))
 (defn fnx [arg]
