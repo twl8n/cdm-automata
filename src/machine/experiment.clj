@@ -342,9 +342,24 @@
   (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
 
   (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 977.0 sh3 0)
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 5000.0 sh3 0) ;; Ok
   (find-bid-cost 996.0 (:end (last sh3)) 996.0 977.0 sh3 0)
-  (find-bid-cost 992.0 (:end (last sh3)) 992.0 977.0 sh3 0)
+
+  ;; Bug! Bid moved beyond the destination. And the cost was going up on trials, not down. {:bid 985.0, :cost 4997, :succeed true}
+  (find-bid-cost 992.0 (:end (last sh3)) 992.0 5000 sh3 0)
+
+  (let [try-bid 992
+        dest-bid 995]
+    (+ try-bid (round-up (/ (- dest-bid try-bid) 2))))
+
+  (half-way 993 1020) ;; [993 1007.0 1020] if 993 too high recurse [1007.0 1020 993] half dest orig
+  (half-way 1007 993) ;; [1007 1000.0 993] if 1007 too low recurse [1000.0 1007 1007] half orig orig
+  (half-way 1007 1020) ;; [1007 1014.0 1020] if 1007 too low recurse 
+  (half-way 1020 1007) ;; [1020 1013.0 1007]
   )
+(defn half-way [orig dest]
+  [orig (+ orig (round-up (/ (- dest orig) 2))) dest])
+
 (defn find-bid-cost
   "When cost exceeds balance, try a new bid closer to the dest.
 When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
@@ -353,17 +368,23 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
   (println "======== trying:" try-bid "dest:" dest-bid )
   (if (or (> 1 try-bid) (> iter 25))
     nil
-    (let [cost (check-bid saved-history try-bid balance)
-          [new-try new-dest] (cond (> cost balance) (do
-                                                      (println "cost >>> balance cost:" cost "try-bid:" try-bid)
-                                                      [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
-                                   (< cost balance) (do
-                                                      (println "cost <<< balance cost:" cost "try-bid:" try-bid)
-                                                      [(- try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
+    (let [try-cost (check-bid saved-history try-bid balance)
+          dest-cost (check-bid saved-history dest-bid balance)
+          _ (println "try-cost: " try-cost " dest-cost: " dest-cost)
+          ;; try-cost < balance return [try-cost try-bid success]
+          ;; try-cost > balance and dest-cost < balance recurse half 
+          ;; try-cost < balance and dest-cost > balance recurse half
+          ;; try-cost > balance and dest-cost > balance return [try-cost try-bid fail]
+          [new-try new-dest] (cond (> try-cost balance) (do
+                                                          (println "cost >>> balance cost:" try-cost "try-bid:" try-bid)
+                                                          [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
+                                   (< try-cost balance) (do
+                                                          (println "cost <<< balance cost:" try-cost "try-bid:" try-bid)
+                                                          [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
           bid-cost (if (= new-try try-bid)
-                     (if (> cost balance)
-                       {:bid prev-bid :cost cost :succeed false}
-                       {:bid try-bid :cost cost :succeed true})
+                     (if (> try-cost balance)
+                       {:bid prev-bid :cost try-cost :succeed false}
+                       {:bid try-bid :cost try-cost :succeed true})
                      (find-bid-cost new-try new-dest try-bid balance saved-history (inc iter)))]
       bid-cost)))
 
