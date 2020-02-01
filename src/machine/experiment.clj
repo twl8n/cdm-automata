@@ -141,6 +141,16 @@
 
 
 
+(def sh3
+  [{:id -1, :sequence -1, :start 1000, :end 1001, :pool-balance 0}
+   {:id 0, :sequence 0, :start 1001, :end 1000, :pool-balance 0}
+   {:id 1,
+    :sequence 1,
+    :start 1000,
+    :actual-cost 976,
+    :end 995.0,
+    :pool-balance 976}])
+
 (defn bid-possible-demo
   [bid-arg history current-history]
   (let [period (inc (:sequence (last history))) ;; Stay with one-based.
@@ -155,6 +165,19 @@
                           (/ (+ (apply + (map :pool-balance history)) (* trading-volume commission-share info-share)) (- rate-of-return 1))))] 
     [bid-arg cost-of-bid]))
 (comment
+  (* const-trading-volume 0.009 0.0) ;; 0.0
+  (apply + (map :pool-balance sh3)) ;; 976
+  (exp 1.1 (inc (:sequence (last sh3)))) ;; 1.2100000000000002
+  (/ 976.0 (- 1.2100000000000002 1)) ;; 4647.619047619043
+  (let [history sh3
+        bid-arg 995
+        current-history {:id 1
+                         :sequence 1
+                         :start (:end (last saved-history))  ;; current price this period based on previous speculation
+                         :end   bid-arg ;; ditto
+                         :pool-balance 1}]
+        (bid-info-share history current-history bid-arg))
+
   (let [saved-history sh3
         intended-bid 995]
     (bid-possible-demo intended-bid saved-history {:id 1
@@ -389,19 +412,6 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
       0
       (let [delt (- origin dest)]
         (/ (abs delt) delt))))
-
-(def sh3
-  [{:id -1, :sequence -1, :start 1000, :end 1001, :pool-balance 0}
-   {:id 0, :sequence 0, :start 1001, :end 1000, :pool-balance 0}
-   {:id 1,
-    :sequence 1,
-    :start 1000,
-    :actual-cost 976,
-    :end 995.0,
-    :pool-balance 976}])
-;; Cost to move to 994 is 4728
-;; Cost to move to 995 is 4648
-
 
 
 ;; (fnx '(1))
