@@ -154,6 +154,15 @@
         cost-of-bid (int (Math/ceil
                           (/ (+ (apply + (map :pool-balance history)) (* trading-volume commission-share info-share)) (- rate-of-return 1))))] 
     [bid-arg cost-of-bid]))
+(comment
+  (let [saved-history sh3
+        intended-bid 995]
+    (bid-possible-demo intended-bid saved-history {:id 1
+                                                   :sequence 1
+                                                   :start (:end (last saved-history))  ;; current price this period based on previous speculation
+                                                   :end   intended-bid ;; ditto
+                                                   :pool-balance 1}))
+  )
 
 ;; The bots' concept of ideal price. Each bot deviates from this.
 ;; Really, each bot needs its own view of future ideal prices.
@@ -191,6 +200,77 @@
 
 (defn binary-search
   [min max target]
+  )
+
+(defn round-up [nn] (if (pos? nn)
+                      (Math/floor (+ nn 0.5))
+                      (Math/ceil (+ nn -0.5))))
+
+(defn half-way [orig dest]
+  (+ orig (round-up (/ (- dest orig) 2))))
+
+(defn check-bid
+  [saved-history intended-bid balance]
+  (let [end-price (:end (last saved-history))
+        current-history {:id 1
+                         :sequence 0
+                         :start end-price    ;; current price this period based on previous speculation
+                         :end   intended-bid ;; ditto
+                         :pool-balance 0}]
+    (second (bid-possible-demo intended-bid saved-history current-history))))
+
+
+(defn find-bid-cost
+  "When cost exceeds balance, try a new bid closer to the dest.
+When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
+When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
+  [try-bid dest-bid prev-bid balance saved-history iter]
+  (let [try-cost (check-bid saved-history try-bid balance)]
+    (println "======== trying:" try-bid "dest:" dest-bid "try-cost:" try-cost)
+    (if (or (> 1 try-bid) (> iter 25))
+      {:bid try-bid :cost try-cost :succeed false}
+      ;; try-cost < balance return [try-cost try-bid success]
+      (if (< try-cost balance)  
+        {:bid try-bid :cost try-cost :succeed true}
+        (let [dest-cost (check-bid saved-history dest-bid balance)
+              _ (println "try-cost: " try-cost " dest-cost: " dest-cost)
+              [new-try new-dest new-orig]
+              (cond
+                ;; try-cost > balance and dest-cost < balance recurse half 
+                (and (> try-cost balance) (< dest-cost balance)) [(half-way try-bid dest-bid) dest-bid prev-bid]
+                ;; try-cost < balance and dest-cost > balance recurse half
+                (and (< try-cost balance) (> dest-cost balance)) [(half-way try-bid dest-bid) prev-bid prev-bid]
+                :else [try-bid dest-bid prev-bid])
+              ;; try-cost > balance and dest-cost > balance return [try-cost try-bid fail]
+              bid-cost (if (= new-try try-bid)
+                         (if (> try-cost balance)
+                           {:bid prev-bid :cost try-cost :succeed false}
+                           {:bid try-bid :cost try-cost :succeed true})
+                         (find-bid-cost new-try new-dest new-orig balance saved-history (inc iter)))]
+          bid-cost)))))
+
+(comment
+  (find-bid-cost 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
+  (find-bid-cost 980.0 (:end (last saved-history)) 980.0 977.0 saved-history 0)
+  (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
+  (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
+
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 977.0 sh3 0)
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 5000.0 sh3 0)
+  (find-bid-cost 995.0 (:end (last sh3)) 1020.0 5000.0 sh3 0) ;; Ok
+  (find-bid-cost 996.0 (:end (last sh3)) 996.0 977.0 sh3 0)
+
+  ;; Bug! Bid moved beyond the destination. And the cost was going up on trials, not down. {:bid 985.0, :cost 4997, :succeed true}
+  (find-bid-cost 992.0 (:end (last sh3)) 992.0 5000 sh3 0)
+
+  (let [try-bid 992
+        dest-bid 995]
+    (+ try-bid (round-up (/ (- dest-bid try-bid) 2))))
+
+  (half-way 993 1020) ;; [993 1007.0 1020] if 993 too high recurse [1007.0 1020 993] half dest orig
+  (half-way 1007 993) ;; [1007 1000.0 993] if 1007 too low recurse [1000.0 1007 1007] half orig orig
+  (half-way 1007 1020) ;; [1007 1014.0 1020] if 1007 too low recurse 
+  (half-way 1020 1007) ;; [1020 1013.0 1007]
   )
 
 
@@ -291,16 +371,6 @@
   (check-bid saved-history 999 1000)
   )
 
-(defn check-bid
-  [saved-history intended-bid balance]
-  (let [end-price (:end (last saved-history))
-        current-history {:id 1
-                         :sequence 0
-                         :start end-price    ;; current price this period based on previous speculation
-                         :end   intended-bid ;; ditto
-                         :pool-balance 0}]
-    (second (bid-possible-demo intended-bid saved-history current-history))))
-
 (defn find-ok-bid
   [saved-history intended-bid balance]
   (when (= 0 intended-bid)
@@ -312,9 +382,6 @@
 (defn -main []
   (pp/pprint (runner (nth ideal-clearing-price 0) saved-history spec)))
 
-(defn round-up [nn] (if (pos? nn)
-                      (Math/floor (+ nn 0.5))
-                      (Math/ceil (+ nn -0.5))))
   
 (defn udir [origin dest]
   "unit direction, +1 up, -1 down. origin > dest is +1. Origin is current price. Dest is bid price."
@@ -335,58 +402,7 @@
 ;; Cost to move to 994 is 4728
 ;; Cost to move to 995 is 4648
 
-(comment
-  (find-bid-cost 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
-  (find-bid-cost 980.0 (:end (last saved-history)) 980.0 977.0 saved-history 0)
-  (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
-  (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
 
-  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 977.0 sh3 0)
-  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 5000.0 sh3 0) ;; Ok
-  (find-bid-cost 996.0 (:end (last sh3)) 996.0 977.0 sh3 0)
-
-  ;; Bug! Bid moved beyond the destination. And the cost was going up on trials, not down. {:bid 985.0, :cost 4997, :succeed true}
-  (find-bid-cost 992.0 (:end (last sh3)) 992.0 5000 sh3 0)
-
-  (let [try-bid 992
-        dest-bid 995]
-    (+ try-bid (round-up (/ (- dest-bid try-bid) 2))))
-
-  (half-way 993 1020) ;; [993 1007.0 1020] if 993 too high recurse [1007.0 1020 993] half dest orig
-  (half-way 1007 993) ;; [1007 1000.0 993] if 1007 too low recurse [1000.0 1007 1007] half orig orig
-  (half-way 1007 1020) ;; [1007 1014.0 1020] if 1007 too low recurse 
-  (half-way 1020 1007) ;; [1020 1013.0 1007]
-  )
-(defn half-way [orig dest]
-  [orig (+ orig (round-up (/ (- dest orig) 2))) dest])
-
-(defn find-bid-cost
-  "When cost exceeds balance, try a new bid closer to the dest.
-When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
-When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
-  [try-bid dest-bid prev-bid balance saved-history iter]
-  (println "======== trying:" try-bid "dest:" dest-bid )
-  (if (or (> 1 try-bid) (> iter 25))
-    nil
-    (let [try-cost (check-bid saved-history try-bid balance)
-          dest-cost (check-bid saved-history dest-bid balance)
-          _ (println "try-cost: " try-cost " dest-cost: " dest-cost)
-          ;; try-cost < balance return [try-cost try-bid success]
-          ;; try-cost > balance and dest-cost < balance recurse half 
-          ;; try-cost < balance and dest-cost > balance recurse half
-          ;; try-cost > balance and dest-cost > balance return [try-cost try-bid fail]
-          [new-try new-dest] (cond (> try-cost balance) (do
-                                                          (println "cost >>> balance cost:" try-cost "try-bid:" try-bid)
-                                                          [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
-                                   (< try-cost balance) (do
-                                                          (println "cost <<< balance cost:" try-cost "try-bid:" try-bid)
-                                                          [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
-          bid-cost (if (= new-try try-bid)
-                     (if (> try-cost balance)
-                       {:bid prev-bid :cost try-cost :succeed false}
-                       {:bid try-bid :cost try-cost :succeed true})
-                     (find-bid-cost new-try new-dest try-bid balance saved-history (inc iter)))]
-      bid-cost)))
 
 ;; (fnx '(1))
 (defn fnx [arg]
@@ -397,4 +413,10 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
       (fnx (conj arg (inc curr))))))
 
 
+                                        ;; (> try-cost balance) (do
+                                        ;;                        (println "cost >>> balance cost:" try-cost "try-bid:" try-bid)
+                                        ;;                        [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
+                                        ;; (< try-cost balance) (do
+                                        ;;                        (println "cost <<< balance cost:" try-cost "try-bid:" try-bid)
+                                        ;;                        [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
         
