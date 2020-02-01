@@ -157,7 +157,6 @@
         trading-volume const-trading-volume ;; Previous period trading volume, or some invented starting value
         commission-share 0.009 ;; (aka 0.9 percent)
         info-share (bid-info-share history current-history bid-arg)
-        ;; info-share (bid-info-share history bid-arg)
         ;; _ (do (printf "info-share: %s bid-arg: %s\n" info-share bid-arg) (flush))
         systematic-return 1.1
         rate-of-return (exp 1.1 period)
@@ -176,7 +175,7 @@
                          :start (:end (last saved-history))  ;; current price this period based on previous speculation
                          :end   bid-arg ;; ditto
                          :pool-balance 1}]
-        (bid-info-share history current-history bid-arg))
+        (bid-info-share history current-history bid-arg));; 0.0
 
   (let [saved-history sh3
         intended-bid 995]
