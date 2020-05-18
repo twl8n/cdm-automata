@@ -83,16 +83,6 @@
   (let [bid (int (Math/ceil (* (:coef one-spec) cp)))]
     {:id (:id one-spec) :bid bid}))
 
-(defn run-spec-v1 [all-spec clearing-price]
-  (map 
-   (fn [cp]
-     (map(fn [xx] (make-bid xx cp)) all-spec))
-   clearing-price))
-
-(defn run-spec [spec clearing-price]
-  "v2"
-  (map (fn [cp] (make-bid spec cp)) clearing-price))
-
 ;; https://github.com/clojure/math.numeric-tower
 
 (defn exp [x n]
@@ -152,6 +142,7 @@
     :pool-balance 976}])
 
 (defn bid-possible-demo
+  "Cost of bid."
   [bid-arg history current-history]
   (let [period (inc (:sequence (last history))) ;; Stay with one-based.
         trading-volume const-trading-volume ;; Previous period trading volume, or some invented starting value
@@ -159,9 +150,10 @@
         info-share (bid-info-share history current-history bid-arg)
         ;; _ (do (printf "info-share: %s bid-arg: %s\n" info-share bid-arg) (flush))
         systematic-return 1.1
-        rate-of-return (exp 1.1 period)
+        rate-of-return (exp 1.1 period) 
+        parimutuel-pool (apply + (map :pool-balance history))
         cost-of-bid (int (Math/ceil
-                          (/ (+ (apply + (map :pool-balance history)) (* trading-volume commission-share info-share)) (- rate-of-return 1))))] 
+                          (/ (* (+ parimutuel-pool (* trading-volume commission-share)) info-share) (- rate-of-return 1))))] 
     [bid-arg cost-of-bid]))
 (comment
   (* const-trading-volume 0.009 0.0) ;; 0.0
@@ -243,9 +235,14 @@
 
 
 (defn find-bid-cost
-  "When cost exceeds balance, try a new bid closer to the dest.
-When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
-When cost exceeds balance and the new-try equals try-bid then we have overshot and the answer is the previous bid."
+  "Binary search. 
+
+   When cost exceeds balance, try a new bid closer to the dest.
+
+   When cost is lower than balance, try a new bid further from the dest, and make the dest the previous try-bid.
+
+   When cost exceeds balance and the new-try equals try-bid then we have overshot. Return the previous bid."
+
   [try-bid dest-bid prev-bid balance saved-history iter]
   (let [try-cost (check-bid saved-history try-bid balance)]
     (println "======== trying:" try-bid "dest:" dest-bid "try-cost:" try-cost)
@@ -277,9 +274,10 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
   (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 949.0 saved-history 0)
   (find-bid-cost 1020.0 (:end (last saved-history)) 1020.0 977.0 saved-history 0)
 
-  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 977.0 sh3 0)
-  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 5000.0 sh3 0)
-  (find-bid-cost 995.0 (:end (last sh3)) 1020.0 5000.0 sh3 0) ;; Ok
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 4000.0 sh3 0) ;; {:bid 998.0, :cost 2607, :succeed true}
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 5000.0 sh3 0) ;; {:bid 1007.0, :cost 4805, :succeed true}
+  (find-bid-cost 1020.0 (:end (last sh3)) 1020.0 8000.0 sh3 0) ;; {:bid 1020.0, :cost 5004, :succeed true}
+  (find-bid-cost 995.0 (:end (last sh3)) 1020.0 5000.0 sh3 0) ;; BAD! 995 to 995 cost 0.0 did not succeed. {:bid 995.0, :cost 0, :succeed true}
   (find-bid-cost 996.0 (:end (last sh3)) 996.0 977.0 sh3 0)
 
   ;; Bug! Bid moved beyond the destination. And the cost was going up on trials, not down. {:bid 985.0, :cost 4997, :succeed true}
@@ -338,13 +336,16 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
             :pool-balance (+ (:cost bid-cost) (:pool-balance (last saved-history)))})}))
 
 
-(defn runner [cp saved-history spec]
-  (let [end-price (:end (last saved-history))
-        spec-bid-vector (map (fn [mspec] (assoc mspec :bid (:bid (make-bid mspec end-price)))) spec)]
+(defn runner [cp local-saved-history spec]
+  (let [end-price (:end (last local-saved-history))
+        _ (def lsh local-saved-history)
+        spec-bid-vector (map (fn [mspec]
+                               (assoc mspec :bid (:bid (make-bid mspec end-price))))
+                             spec)]
     (prn "End price: " end-price spec-bid-vector)
     (reduce   
      single-bid-reducer
-     {:saved-history saved-history :spec []}
+     {:saved-history local-saved-history :spec []}
      spec-bid-vector)))
    
   
@@ -393,16 +394,9 @@ When cost exceeds balance and the new-try equals try-bid then we have overshot a
   (check-bid saved-history 999 1000)
   )
 
-(defn find-ok-bid
-  [saved-history intended-bid balance]
-  (when (= 0 intended-bid)
-    nil)
-  (if (< balance (check-bid saved-history intended-bid balance))
-    intended-bid
-    (find-ok-bid saved-history (/ intended-bid 2) balance)))
-
 (defn -main []
-  (pp/pprint (runner (nth ideal-clearing-price 0) saved-history spec)))
+  (let [new-history (runner (nth ideal-clearing-price 0) saved-history spec)]
+    (:saved-history new-history)))
 
   
 (defn udir [origin dest]

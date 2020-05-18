@@ -23,10 +23,13 @@ lein run
 
 The source file is src/machine/experiment.clj. The entry point is defn -main.
 
-#### todo machine
 
-* demo4 fails, perhaps because will-not-dashboard doesn't exist.
-Maybe if table has any fail during parsing, then exit.
+#### todo CDM
+
+* price 995 to 995 costs zero and succeeds. Maybe it should, but something needs to never do a zero move price change.
+
+
+#### todo machine
 
 * upgrade state node vectors to a map for the sake of debugging, and
 get rid of nth and assoc with seq indexes. The indexes are very bug prone.

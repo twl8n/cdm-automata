@@ -1,3 +1,14 @@
+(defn run-spec-v1 [all-spec clearing-price]
+  (map 
+   (fn [cp]
+     (map(fn [xx] (make-bid xx cp)) all-spec))
+   clearing-price))
+
+(defn run-spec [spec clearing-price]
+  "v2"
+  (map (fn [cp] (make-bid spec cp)) clearing-price))
+
+
   (defn old-traverse
   "Must have a starting state aka edge. jump-stack initially is empty. Return a map with keys wait-next, msg."
   [curr-state jump-stack]
