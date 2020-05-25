@@ -1,13 +1,13 @@
-#### cdm automata
-
-Tech: SQLite, Clojure
+#### 
 
 Sketch:
 
 Automata for each of the four marketplace roles plus one to play the role of the environment. Framework to
-support multiples of consumer, producer, and forecaster.
+support multiples of consumer, producer, and forecaster. The actual code that will resolve forecasts and
+trades is used by the automata with the result being a simulated market based on the actual Coordisc code and
+algos.
 
-The "framework" can be a fifth automata.
+The "framework" can be a fifth automata?
 
 
 #### Usage
@@ -21,98 +21,23 @@ https://leiningen.org/#install
 lein run
 ```
 
-The source file is src/machine/experiment.clj. The entry point is defn -main.
-
 
 #### todo CDM
 
-* price 995 to 995 costs zero and succeeds. Maybe it should, but something needs to never do a zero move price change.
+x fix the directory tree to match a standard clojure project
+x rename "speculator" to "forecaster" since anything "spec" would be confused with clojure spec.
 
 
-#### todo machine
-
-* upgrade state node vectors to a map for the sake of debugging, and
-get rid of nth and assoc with seq indexes. The indexes are very bug prone.
-
-* x test.clj change to hash of seq of seq where key is edge name and seqs are states for that edge.
-
-* x test.clj munge strings to functions (or symbols) at parse time
-or leave them as strings and munge-eval at runtime
-
-* x port test.clj to core.clj
-
-* x get it all working, run demos
-
-* + make traverse return a map with fres, final state, etc. so the calling code can always determine what happened
-
-* fres depleted when not in wait is an error, and the machine should halt or something.
-
-* x sub-table returns only the current edges
-
-* save or return the final state when we halted (wait). Return this to the top level.
-
-* ? recursing on traverse needs to send the new edge and jumpstack, but the table global will be used by the
-next call to sub-table
-
-* x execution halts on wait, or running out of anything (edges, states, etc.)
-
-* x add traverse needs to return when st (sub-table ...) is consumed.
-
-* sanity check, warn if next-state-edgte (column 4) is not empty when func is wait.
-
-* sanity check can't reach the 3rd line:
-
-(The test of the second line is always true, so that will always fire.
-
-| login          | if-logged-in |                          | pages           |
-| login          |              | draw-login               | login-wait      |
-| login          |              | wait                     | login           |
-
-* exit kills the repl, need something (like an exception) to exit clj, but leave the repl intact.
-
-(System/exit 0)
-
-#### usage
-
-(def logged-in-state true)
-(demo)
-
-Retur continues. Hit ^D several times to cancel. (demo) is in a read-line loop.
-
-#### notes
-
-(defn foo [xx] (str "this is foo " xx))
-(def bar (eval (read-string "{:func foo}")))
-((:func bar) 22)
-
-(def bar {:func (eval 'foo)})
-
-(def bar {:func (eval (symbol "foo"))})
-
-x
-
-Workflow state machine ported to Clojure
-
-;; turn this into a function, run on the seq of maps that is the state table from read-state-file
-;;   (map (fn [x] (if (not (= "" (x :test))) (assoc x :testx (eval (read-string (x :test)))) x)) table)
+* migrate away from lein to tools.deps.
+* add more unit tests for forecast functions. Need to confirm behavior of every function.
+* verify that rounding is always accounted for explicitly
+* create one or more automata modules suitable to various simulations
+* maybe create a front end to allow humans to interact with automata (bots).
+* price 995 to 995 costs zero and succeeds? Maybe it should, but something needs to never do a zero move price change.
 
 
-#### github mirror push 
+#### License TBD
 
-When cloning a repo, github docs recommend:
-
-$ git push --mirror https://github.com/exampleuser/new-repository.git
-
-The command above does not use ssh, and will prompt for a userid and password. 
-
-but you almost certainly want:
-
-> git push --mirror git@github.com:exampleuser/new-repository.git
-
-This command will use your nomral github ssh credentials.
-
-#### License
-
-Copyright © 2017 Tom Laudeman
+Copyright © 2020 Noah Healy
 
 

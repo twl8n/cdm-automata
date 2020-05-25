@@ -1,27 +1,27 @@
-(ns machine.experiment
+(ns coordisc.forecast
   (:require [clojure.string :as string]
             [clojure.pprint :as pp]))
 
 
 (def const-trading-volume 13000)
 
-;; How spec bots behave.
-(def spec [{:id 1
-            :coef 0.998
-            :balance 1000}
-           {:id 2
-            :coef 1.02
-            :balance 1000}])
+;; How forecast bots behave.
+(def forecast [{:id 1
+                :coef 0.998
+                :balance 1000}
+               {:id 2
+                :coef 1.02
+                :balance 1000}])
 
 ;; Special saved-history initial value
 (def saved-history [{:id -1
                      :sequence -1
-                     :start 1000 ;; current price this period based on previous speculation
+                     :start 1000 ;; current price this period based on previous forecast
                      :end   1001   ;; ditto
                      :pool-balance 0}
                     {:id 0
                      :sequence 0
-                     :start 1001 ;; current price this period based on previous speculation
+                     :start 1001 ;; current price this period based on previous forecast
                      :end   1000 ;; ditto
                      :pool-balance 0}])
 
@@ -79,9 +79,9 @@
 
 ;; (int (Math/ceil (/ 3 2)))
 
-(defn make-bid [one-spec cp]
-  (let [bid (int (Math/ceil (* (:coef one-spec) cp)))]
-    {:id (:id one-spec) :bid bid}))
+(defn make-bid [one-forecast cp]
+  (let [bid (int (Math/ceil (* (:coef one-forecast) cp)))]
+    {:id (:id one-forecast) :bid bid}))
 
 ;; https://github.com/clojure/math.numeric-tower
 
@@ -92,14 +92,14 @@
   (or (and (<= aa bb) (<= bb cc))
       (and (>= aa bb) (>= bb cc))
       ))
-  
+
 (defn info-metric [start end]
   (abs (log (/ end start))))
 
 (def projected-history
   {:id 1
    :sequence 0
-   :start 1001 ;; current price this period based on previous speculation
+   :start 1001 ;; current price this period based on previous forecast
    :end   800 ;; ditto
    :pool-balance 0})
 
@@ -164,16 +164,16 @@
         bid-arg 995
         current-history {:id 1
                          :sequence 1
-                         :start (:end (last saved-history))  ;; current price this period based on previous speculation
+                         :start (:end (last saved-history))  ;; current price this period based on previous forecast
                          :end   bid-arg ;; ditto
                          :pool-balance 1}]
-        (bid-info-share history current-history bid-arg));; 0.0
+    (bid-info-share history current-history bid-arg));; 0.0
 
   (let [saved-history sh3
         intended-bid 995]
     (bid-possible-demo intended-bid saved-history {:id 1
                                                    :sequence 1
-                                                   :start (:end (last saved-history))  ;; current price this period based on previous speculation
+                                                   :start (:end (last saved-history))  ;; current price this period based on previous forecast
                                                    :end   intended-bid ;; ditto
                                                    :pool-balance 1}))
   )
@@ -189,14 +189,14 @@
 (defn calc-trading-volume [final-clearing ideal-clearing ideal-volume]
   (let [magic-number 10 
         temp (- final-clearing ideal-clearing)]
-        (- ideal-volume (* magic-number (* temp temp)))))
+    (- ideal-volume (* magic-number (* temp temp)))))
 
 
 ;; Example of things that bots want to know in order to bid.
-(def single-spec {:bid "this speculator bid, int"
-                  :id "id from sped, int"
-                  :coef "coef from spec, float"
-                  :balance "balance from spec, int"})
+(def single-forecast {:bid "this forecaster bid, int"
+                      :id "id from forecast, int"
+                      :coef "coef from forecast, float"
+                      :balance "balance from forecast, int"})
 
 
 (defn found-example-binary-search
@@ -228,7 +228,7 @@
   (let [end-price (:end (last saved-history))
         current-history {:id 1
                          :sequence 0
-                         :start end-price    ;; current price this period based on previous speculation
+                         :start end-price    ;; current price this period based on previous forecast
                          :end   intended-bid ;; ditto
                          :pool-balance 0}]
     (second (bid-possible-demo intended-bid saved-history current-history))))
@@ -296,15 +296,15 @@
 
 (defn single-bid-reducer
   "Deprecated. May not work at all. See new code below that does a binary search for an affordable price change"
-  [period-record my-spec]
-  (printf "using: %s\n" my-spec)
+  [period-record my-forecast]
+  (printf "using: %s\n" my-forecast)
   (flush)
   (let [saved-history (:saved-history period-record)
         _ (do (printf "local sh: %s\n" saved-history) (flush))
         cp (:end (last saved-history))
         _ (do (printf "cp: %s\n" cp) (flush))
-        bid-wanted (:bid my-spec) 
-        _ (do (printf "bid-wanted: %s for bid %s on %s\n" bid-wanted (:bid my-spec) cp) (flush))
+        bid-wanted (:bid my-forecast) 
+        _ (do (printf "bid-wanted: %s for bid %s on %s\n" bid-wanted (:bid my-forecast) cp) (flush))
         bid-range  (if (< cp bid-wanted)
                      (range bid-wanted cp -100000)
                      (range bid-wanted cp 100000))
@@ -321,14 +321,14 @@
         _ (def g-bid-cost bid-cost)
         _ (do (printf "bid-wanted: %s\n" bid-wanted) (flush))
         ;; (find-bid-cost 980.0 (:end (last saved-history)) 980.0 949.0 saved-history 0)
-        bid-cost (find-bid-cost bid-wanted cp bid-wanted (:balance my-spec) saved-history 0)]
+        bid-cost (find-bid-cost bid-wanted cp bid-wanted (:balance my-forecast) saved-history 0)]
     ;; resolve bid
-    ;; return updated save history, and new spec
-    {:spec (conj (:spec period-record)
-                 (assoc my-spec :balance (- (:balance my-spec) (:cost bid-cost))))
+    ;; return updated save history, and new forecast
+    {:forecast (conj (:forecast period-record)
+                     (assoc my-forecast :balance (- (:balance my-forecast) (:cost bid-cost))))
      :saved-history 
      (conj saved-history
-           {:id (:id my-spec)
+           {:id (:id my-forecast)
             :sequence (inc (:sequence (last saved-history)))
             :start (:end (last saved-history))
             :actual-cost (:cost bid-cost)
@@ -336,26 +336,26 @@
             :pool-balance (+ (:cost bid-cost) (:pool-balance (last saved-history)))})}))
 
 
-(defn runner [cp local-saved-history spec]
+(defn runner [cp local-saved-history forecast]
   (let [end-price (:end (last local-saved-history))
         _ (def lsh local-saved-history)
-        spec-bid-vector (map (fn [mspec]
-                               (assoc mspec :bid (:bid (make-bid mspec end-price))))
-                             spec)]
-    (prn "End price: " end-price spec-bid-vector)
+        forecast-bid-vector (map (fn [mforecast]
+                                   (assoc mforecast :bid (:bid (make-bid mforecast end-price))))
+                                 forecast)]
+    (prn "End price: " end-price forecast-bid-vector)
     (reduce   
      single-bid-reducer
-     {:saved-history local-saved-history :spec []}
-     spec-bid-vector)))
-   
-  
+     {:saved-history local-saved-history :forecast []}
+     forecast-bid-vector)))
+
+
 (comment
-  (pp/pprint (runner (nth clearing-price 0) saved-history spec))
+  (pp/pprint (runner (nth clearing-price 0) saved-history forecast))
   ;; reduce complex value
   (reduce
-   (fn [yy xx] (prn xx (:spec yy))
-     {:spec (conj (:spec yy) {:id xx}) :balance (+ xx  (:balance yy))})
-   {:spec [] :balance 10}
+   (fn [yy xx] (prn xx (:forecast yy))
+     {:forecast (conj (:forecast yy) {:id xx}) :balance (+ xx  (:balance yy))})
+   {:forecast [] :balance 10}
    [1 2 1 4])
 
   (calc-trading-volume 99 100 5000)
@@ -368,10 +368,10 @@
   ;; bid-range: (1280000 1180000 1080000 980000 880000)
   ;; Done: change the number to have fewer zeros
   ;; Todo: use a multipler to test efficiency of the algo.
-  (make-bid (first spec) (:end (last saved-history))) ;; {:id 1, :bid 800}
-  (first spec) ;; {:id 1, :coef 0.8, :balance 1000}
+  (make-bid (first forecast) (:end (last saved-history))) ;; {:id 1, :bid 800}
+  (first forecast) ;; {:id 1, :coef 0.8, :balance 1000}
   (merge {:id 1, :coef 0.8, :balance 1000} {:id 1, :bid 800})
-  (map (fn [mspec] (assoc mspec :bid (:bid (make-bid mspec (:end (last saved-history)))))) spec)
+  (map (fn [mforecast] (assoc mforecast :bid (:bid (make-bid mforecast (:end (last saved-history)))))) forecast)
 
 
   ;; @@
@@ -380,13 +380,13 @@
   (total-info {:start 1001 :end 1000} 800)
   (/ 0.5108256237659907 (reduce + 0.51 '(0 9.995003330834993E-4)))
   (let [end-price (:end (last saved-history))
-        mspec {:id 1
-               :coef 0.980
-               :balance 1000} ;; (nth spec 0)
-        intended-bid (merge mspec (make-bid mspec end-price))
+        mforecast {:id 1
+                   :coef 0.980
+                   :balance 1000} ;; (nth forecast 0)
+        intended-bid (merge mforecast (make-bid mforecast end-price))
         current-history {:id 1
                          :sequence 0
-                         :start end-price           ;; current price this period based on previous speculation
+                         :start end-price           ;; current price this period based on previous forecast
                          :end   (:bid intended-bid) ;; ditto
                          :pool-balance 0}]
     [(bid-possible-demo (:bid intended-bid) saved-history current-history) intended-bid])
@@ -394,32 +394,13 @@
   (check-bid saved-history 999 1000)
   )
 
-(defn -main []
-  (let [new-history (runner (nth ideal-clearing-price 0) saved-history spec)]
-    (:saved-history new-history)))
-
-  
 (defn udir [origin dest]
   "unit direction, +1 up, -1 down. origin > dest is +1. Origin is current price. Dest is bid price."
-    (if (= origin dest)
-      0
-      (let [delt (- origin dest)]
-        (/ (abs delt) delt))))
+  (if (= origin dest)
+    0
+    (let [delt (- origin dest)]
+      (/ (abs delt) delt))))
 
-
-;; (fnx '(1))
-(defn fnx [arg]
-  (println arg)
-  (let [curr (first arg)]
-    (if (= 5 curr)
-      (nth arg 1)
-      (fnx (conj arg (inc curr))))))
-
-
-                                        ;; (> try-cost balance) (do
-                                        ;;                        (println "cost >>> balance cost:" try-cost "try-bid:" try-bid)
-                                        ;;                        [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) dest-bid])
-                                        ;; (< try-cost balance) (do
-                                        ;;                        (println "cost <<< balance cost:" try-cost "try-bid:" try-bid)
-                                        ;;                        [(+ try-bid (round-up (/ (- dest-bid try-bid) 2))) try-bid]))
-        
+(comment
+  (runner (nth ideal-clearing-price 0) saved-history forecast)
+  )
