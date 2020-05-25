@@ -2,6 +2,10 @@
   (:require [clojure.string :as string]
             [clojure.pprint :as pp]))
 
+;; This is the library of functions for forecasts. So far, we can resolve price bids. We've got very
+;; rudimentary price history, and we've got really rudimentary bot code. Although this code seems to (mostly)
+;; work, everything here needs to be validated.
+
 
 (def const-trading-volume 13000)
 
@@ -13,7 +17,7 @@
                 :coef 1.02
                 :balance 1000}])
 
-;; Special saved-history initial value
+;; saved price history The initial value is special. Market first forecast is a singularity, and needs more clarity.
 (def saved-history [{:id -1
                      :sequence -1
                      :start 1000 ;; current price this period based on previous forecast
@@ -52,25 +56,6 @@
   (swap! bids (fn [cval] (conj cval {:value new-bid
                                      :id (:id which-brain)}))))
 
-
-(defn think [which-brain]
-  (println "thinking with " (:id which-brain))
-  (when (:prefer-low which-brain) (bid which-brain (* current-ideal 0.95)))
-  (when (:prefer-high which-brain) (bid which-brain (* current-ideal 1.05))))
-
-(do
-  (map think [low-brain high-brain]))
-
-;; Seems like we can write a finite automata inline. Not with cond-> as below, but maybe if cont-> that checked the jump value
-;; We need a goto-like behavior.
-(def state (atom :start))
-(swap! state (fn [xx] :start))
-
-(defn experimental-fsm-start []
-  (cond-> (swap! state (fn [xx] :start))
-    (= @state :start) ((fn [xx] (printf "starting %s\n" xx) (swap! state (fn [xx] :wait)) :wait))
-    (= @state :debug) ((do (println "debugging") :wait))
-    (= @state :wait) ((fn [xx] (printf "waiting %s\n" xx )))))
 
 ;; amount that buyers and sellers bring to the market
 
