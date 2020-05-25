@@ -24,10 +24,6 @@ lein run
 
 #### todo CDM
 
-x fix the directory tree to match a standard clojure project
-x rename "speculator" to "forecaster" since anything "spec" would be confused with clojure spec.
-
-
 * migrate away from lein to tools.deps.
 * add more unit tests for forecast functions. Need to confirm behavior of every function.
 * verify that rounding is always accounted for explicitly
