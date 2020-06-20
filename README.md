@@ -12,8 +12,15 @@ The "framework" can be a fifth automata?
 
 #### Usage
 
-This software uses Leiningen. As far as I can remember, installing Leiningen also installs Clojure, so there
-is only a single dependency to get running.
+The fastest launch is with babashka (aka bb), which is a Clojure interpreter.
+
+https://github.com/borkdude/babashka
+
+```bash
+bb -cp src --main coordisc.core
+```
+
+This software sort of uses Leiningen. Leiningen installs its own private copy of Clojure (or something).
 
 https://leiningen.org/#install
 
@@ -21,9 +28,21 @@ https://leiningen.org/#install
 lein run
 ```
 
+Alternatively install Clojure, and run coordisc via Clojure. 
+
+https://clojure.org/guides/getting_started
+
+
+```bash
+clojure -m coordisc.core
+```
+
 
 #### todo CDM
 
+* Add ideal clearing price to saved-history to make results easier to interpret
+x create functions for bots: good-price and bad-price.
+x add usage notes for lein, clojure, and bb.
 * migrate away from lein to tools.deps.
 * add more unit tests for forecast functions. Need to confirm behavior of every function.
 * verify that rounding is always accounted for explicitly

@@ -6,6 +6,6 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/tools.namespace "0.2.11"]]
   ;; :main ^:skip-aot machine.core
-  :main ^:skip-aot machine.experiment
+  :main ^:skip-aot coordisc.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

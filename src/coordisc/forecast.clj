@@ -9,27 +9,6 @@
 
 (def const-trading-volume 13000)
 
-;; How forecast bots behave.
-(def forecast [{:id 1
-                :coef 0.998
-                :balance 1000}
-               {:id 2
-                :coef 1.02
-                :balance 1000}])
-
-;; saved price history The initial value is special. Market first forecast is a singularity, and needs more clarity.
-(def saved-history [{:id -1
-                     :sequence -1
-                     :start 1000 ;; current price this period based on previous forecast
-                     :end   1001   ;; ditto
-                     :pool-balance 0}
-                    {:id 0
-                     :sequence 0
-                     :start 1001 ;; current price this period based on previous forecast
-                     :end   1000 ;; ditto
-                     :pool-balance 0}])
-
-
 (defn log [xx]
   (Math/log xx))
 
@@ -63,10 +42,6 @@
 ;; (int (Math/ceil (+ trading-volume (* fudge-factor (exp (- clearing-price final-price) 2)))))
 
 ;; (int (Math/ceil (/ 3 2)))
-
-(defn make-bid [one-forecast cp]
-  (let [bid (int (Math/ceil (* (:coef one-forecast) cp)))]
-    {:id (:id one-forecast) :bid bid}))
 
 ;; https://github.com/clojure/math.numeric-tower
 
@@ -162,14 +137,6 @@
                                                    :end   intended-bid ;; ditto
                                                    :pool-balance 1}))
   )
-
-;; The bots' concept of ideal price. Each bot deviates from this.
-;; Really, each bot needs its own view of future ideal prices.
-
-;; Price in cents, in the range of $10K
-(def ideal-clearing-price
-  (map #(* 10000 %)
-       [100 105 105 106 107 108 108 100 99 90 95 95 98 100 100 101 99 102 98 102 103])) 
 
 (defn calc-trading-volume [final-clearing ideal-clearing ideal-volume]
   (let [magic-number 10 
@@ -321,45 +288,9 @@
             :pool-balance (+ (:cost bid-cost) (:pool-balance (last saved-history)))})}))
 
 
-(defn runner [cp local-saved-history forecast]
-  (let [end-price (:end (last local-saved-history))
-        _ (def lsh local-saved-history)
-        forecast-bid-vector (map (fn [mforecast]
-                                   (assoc mforecast :bid (:bid (make-bid mforecast end-price))))
-                                 forecast)]
-    (prn "End price: " end-price forecast-bid-vector)
-    (reduce   
-     single-bid-reducer
-     {:saved-history local-saved-history :forecast []}
-     forecast-bid-vector)))
-
-
 (comment
-  (pp/pprint (runner (nth clearing-price 0) saved-history forecast))
-  ;; reduce complex value
-  (reduce
-   (fn [yy xx] (prn xx (:forecast yy))
-     {:forecast (conj (:forecast yy) {:id xx}) :balance (+ xx  (:balance yy))})
-   {:forecast [] :balance 10}
-   [1 2 1 4])
-
   (calc-trading-volume 99 100 5000)
 
-
-  ;; Binary search over the range from (current price) to (my bid price)
-  ;; Current price is the most recent :end price, which changes in the local history as bids are resolved.
-  ;; We start with (:end (last saved-history)), 1000
-  ;; The first bidder wants 0.8 which is 800. We need to binary search from 1000 back to 800.
-  ;; bid-range: (1280000 1180000 1080000 980000 880000)
-  ;; Done: change the number to have fewer zeros
-  ;; Todo: use a multipler to test efficiency of the algo.
-  (make-bid (first forecast) (:end (last saved-history))) ;; {:id 1, :bid 800}
-  (first forecast) ;; {:id 1, :coef 0.8, :balance 1000}
-  (merge {:id 1, :coef 0.8, :balance 1000} {:id 1, :bid 800})
-  (map (fn [mforecast] (assoc mforecast :bid (:bid (make-bid mforecast (:end (last saved-history)))))) forecast)
-
-
-  ;; @@
   (info-metric 800 1000) ;; 0.22314355131420976
   (info-metric 1000 1000) ;; 0.0
   (total-info {:start 1001 :end 1000} 800)
@@ -386,6 +317,3 @@
     (let [delt (- origin dest)]
       (/ (abs delt) delt))))
 
-(comment
-  (runner (nth ideal-clearing-price 0) saved-history forecast)
-  )
