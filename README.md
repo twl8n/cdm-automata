@@ -51,7 +51,11 @@ x add usage notes for lein, clojure, and bb.
 * price 995 to 995 costs zero and succeeds? Maybe it should, but something needs to never do a zero move price change.
 
 
-#### License TBD
+#### License 
+
+Creative Commons Attribution 4.0 International Public License
+
+https://creativecommons.org/licenses/by/4.0/legalcode
 
 Copyright © 2020 Noah Healy
 
