@@ -53,17 +53,22 @@
       (and (>= aa bb) (>= bb cc))
       ))
 
-(defn info-metric [start end]
-  (abs (log (/ end start))))
+(comment
+  ;; Things that could go wrong in info-metric without sanity checking
+  (abs (log -990)) ;; NaN
+  (abs (log -0.99)) ;; NaN
+  (abs (log 0)) ;; Infinity
+  )
 
-(def projected-history
-  {:id 1
-   :sequence 0
-   :start 1001 ;; current price this period based on previous forecast
-   :end   800 ;; ditto
-   :pool-balance 0})
+(defn info-metric
+  "Return zero when the computation is not possible, even if the result is Infinity or NaN"
+  [start end]
+  (if (= 0 start) 0
+      (let [delta-es (/ end start)]
+        (def xx delta-es)
+        (if (>= 0 delta-es) 0
+            (abs (log delta-es))))))
 
-;; (total-info projected-history 800)
 (defn total-info [sh bid]
   (let [start (:start sh)
         end (:end sh)
