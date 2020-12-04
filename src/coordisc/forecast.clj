@@ -6,6 +6,18 @@
 ;; rudimentary price history, and we've got really rudimentary bot code. Although this code seems to (mostly)
 ;; work, everything here needs to be validated.
 
+;; A 3 transaction saved history, for demo/comment purposes. Working code examples in comments rely on this
+;; def. Whe we have sufficient tests to illustrate calling each fn, you can clean this up.
+(def sh3
+  [{:id -1, :sequence -1, :start 1000, :end 1001, :pool-balance 0}
+   {:id 0, :sequence 0, :start 1001, :end 1000, :pool-balance 0}
+   {:id 1,
+    :sequence 1,
+    :start 1000,
+    :actual-cost 976,
+    :end 995.0,
+    :pool-balance 976}])
+
 
 (def const-trading-volume 13000)
 
@@ -69,7 +81,9 @@
         (if (>= 0 delta-es) 0
             (abs (log delta-es))))))
 
-(defn total-info [sh bid]
+(defn total-info
+  "Total info for this bid and one history transaction. bid-info-share accumulates all historical total-info values."
+  [sh bid]
   (let [start (:start sh)
         end (:end sh)
         ti (cond
@@ -85,26 +99,38 @@
     (reduce + (info-metric intended-bid end) (map #(total-info % intended-bid) local-history))))
 
 ;; (info-metric 800 (:end (last saved-history)))
-(defn bid-info-share [local-history current-history intended-bid ]
+(comment
+  (let [saved-history sh3
+        intended-bid 985]
+    [(bid-info-share intended-bid saved-history {:id 1
+                                                 :sequence 1
+                                                 :start (:end (last saved-history))  ;; current price this period based on previous forecast
+                                                 :end   intended-bid ;; ditto
+                                                 :pool-balance 1})
+     (bid-possible-demo intended-bid saved-history {:id 1
+                                                    :sequence 1
+                                                    :start (:end (last saved-history))  ;; current price this period based on previous forecast
+                                                    :end   intended-bid ;; ditto
+                                                    :pool-balance 1})])
+  )
+
+
+;; :share is the value you want
+;; :reduced is a sanity check/debug value of the reduced info sequence
+;; :bid-info is the info-metric of the intended bid
+;; :info-seq if the complete info sequence
+(defn bid-info-share
+  "Accumulate all the history info by reducing with +, then divide current bid's info metric by the accumulated info history."
+  [intended-bid local-history current-history]
   (let [end (:end (last local-history))
         bid-info (info-metric intended-bid end)
-        info-seq (map #(total-info % intended-bid) local-history)]
+        info-seq (map #(total-info % intended-bid) local-history)
+        reduced-info (reduce + bid-info info-seq)]
     ;; (println "info-seq: " info-seq "bid-info: " bid-info )
     (if (= intended-bid end) 
-      0
-      (/ bid-info (reduce + bid-info info-seq)))))
+      {:share 0 :reduced 0 :bid-info bid-info :info-seq info-seq}
+      {:share (/ bid-info reduced-info) :reduced reduced-info :bid-info bid-info :info-seq info-seq})))
 
-
-
-(def sh3
-  [{:id -1, :sequence -1, :start 1000, :end 1001, :pool-balance 0}
-   {:id 0, :sequence 0, :start 1001, :end 1000, :pool-balance 0}
-   {:id 1,
-    :sequence 1,
-    :start 1000,
-    :actual-cost 976,
-    :end 995.0,
-    :pool-balance 976}])
 
 (defn bid-possible-demo
   "Cost of bid."
@@ -112,7 +138,7 @@
   (let [period (inc (:sequence (last history))) ;; Stay with one-based.
         trading-volume const-trading-volume ;; Previous period trading volume, or some invented starting value
         commission-share 0.009 ;; (aka 0.9 percent)
-        info-share (bid-info-share history current-history bid-arg)
+        {info-share :share} (bid-info-share bid-arg history current-history)
         ;; _ (do (printf "info-share: %s bid-arg: %s\n" info-share bid-arg) (flush))
         systematic-return 1.1
         rate-of-return (exp 1.1 period) 
@@ -132,7 +158,7 @@
                          :start (:end (last saved-history))  ;; current price this period based on previous forecast
                          :end   bid-arg ;; ditto
                          :pool-balance 1}]
-    (bid-info-share history current-history bid-arg));; 0.0
+    (bid-info-share bid-arg history current-history));; 0.0
 
   (let [saved-history sh3
         intended-bid 995]

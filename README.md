@@ -35,6 +35,8 @@ https://clojure.org/guides/getting_started
 
 ```bash
 clojure -m coordisc.core
+clojure test/run-all.clj
+clj -A:test -m forecast-tests
 ```
 
 

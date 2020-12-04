@@ -7,5 +7,5 @@
 ;; everytime the file is eval'd in cider. We don't want a call to -main at the end of the test file because we
 ;; don't want the test running everytime we eval the file in cider.
 
-(load-string (str (slurp "test/forecast-tests.clj") "(-main)"))
+(load-string (str (slurp "test/forecast_tests.clj") "(-main)"))
                   
