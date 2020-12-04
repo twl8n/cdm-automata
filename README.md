@@ -35,9 +35,16 @@ https://clojure.org/guides/getting_started
 
 ```bash
 clojure -m coordisc.core
+```
+
+How to run tests: 
+
+
+```bash
 clojure test/run-all.clj
 clj -A:test -m forecast-tests
 ```
+
 
 
 #### todo CDM
