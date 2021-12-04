@@ -1,16 +1,56 @@
 (ns forecast-tests
-  (:require [coordisc.forecast :refer :all]))
+  (:require [coordisc.forecast :refer :all]
+            [clojure.math.numeric-tower :as math]))
 
 (comment
   ;; With deps.edn, you can do this: clj -A:test -m forecast-tests
-
-  
-
-  
-￼  ;; info-metric requires 2 positive inputs because of the symmetry of (abs(log (/ a b))) both orderings of start and end will have the same output.
-￼  ;; Its sensible to return 0 for invalid inputs since the system should register that as no information offered and do nothing as a result
+  ;; info-metric requires 2 positive inputs because of the symmetry of (abs(log (/ a b))) both orderings of start and end will have the same output.
+  ;; Its sensible to return 0 for invalid inputs since the system should register that as no information offered and do nothing as a result
   ;; from a UI perspective validating inputs to cleanse zeros and negatives is a good idea.
-￼  )
+  ￼  )
+
+(defn check-info-metric []
+  (= 0 (info-metric 0 21)) ;; if (or (<= aa 0) (<= bb 0) then 0
+  (= 0 (info-metric -1 21))
+  (= 0 (info-metric 21 0))
+  (= 0 (info-metric 21 -1))
+  (= 0 (info-metric 21 21)) ;; if aa == bb then 0
+  (> (info-metric 21 34) 0) ;; if aa <> bb then positive
+
+  ;; clojure.math.numeric-tower then expt will do a better job than exp so replace that exponential
+  ;; nn*(info-metric aa bb) == (info-metric (exp aa nn) (exp bb nn))
+  ;; may be some slight rounding errors with this.
+  (let [aa 21.0
+       bb 31.0
+       nn 4.0]
+    (prn (* nn (info-metric aa bb)) (info-metric (math/expt aa nn) (math/expt bb nn))))
+  (let [aa 21
+        bb 31
+        nn 4]
+    (= (info-metric aa bb) (info-metric bb aa))))
+
+(comment
+  (let [aa 21.0
+        bb 31.0
+        nn 4.0]
+    [(* nn (info-metric aa bb)) 
+     (info-metric (math/expt aa nn) (math/expt bb nn))])
+  ;; [1.5578590670468933 1.557859067046893]
+  (math/expt 21.0 4)
+  )
+
+
+(defn check-between []
+  (and 
+  (= (between 1 2 3) true)
+  (= (between 1 3 2) false)
+  (= (between 1 1 3) true)
+  (= (between 2 2 1) true)
+  (= (between 3 3 3) true)
+  (= (between 3 2 1) true))
+  (try (between 1 "b" 2)
+       (catch Exception e
+           true)))
 
 (defn check-info-metric []
   (and 
@@ -100,7 +140,8 @@
   (let [test-results
         [(check-info-metric)
          (check-total-info)
-         (check-bid-info-share)]]
+         (check-bid-info-share)
+         (check-between)]]
   (printf "%s tests performed: %s passed: %s\n" 
           (ns-name *ns*)
           (count test-results)

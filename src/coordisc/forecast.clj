@@ -1,5 +1,6 @@
 (ns coordisc.forecast
   (:require [clojure.string :as string]
+            [clojure.math.numeric-tower :as math]
             [clojure.pprint :as pp]))
 
 ;; This is the library of functions for forecasts. So far, we can resolve price bids. We've got very
@@ -57,10 +58,32 @@
 
 ;; https://github.com/clojure/math.numeric-tower
 
-(defn exp [x n]
+(defn old-exp [x n]
   (reduce * (repeat n x)))
 
+(defn exp [x n]
+  (math/expt x n))
+
+(comment
+  ;; example precondition
+  (defn fx [& args]
+    {:pre [(= 2 (count args))]}
+    args)
+
+  ;; user=> (fx 1 2)
+  ;; (1 2)
+  ;; user=> (fx 1 2 3)
+  ;; AssertionError Assert failed: (= 2 (count args))  user/fx (NO_SOURCE_FILE:1)
+  )
+
+(defn number-check [fn-name xx]
+  (when (not (number? xx))
+    (throw (Exception. (format "Non-numeric arg `%s` passed to `%s`" xx fn-name)))))
+
+;; Non-numeric args need to throw an error.
 (defn between [aa bb cc]
+  (doseq [xx [aa bb cc]] (number-check "between" xx))
+  (when (not (every? identity (map number? [aa bb cc]))) )
   (or (and (<= aa bb) (<= bb cc))
       (and (>= aa bb) (>= bb cc))
       ))
@@ -77,7 +100,6 @@
   [start end]
   (if (= 0 start) 0
       (let [delta-es (/ end start)]
-        (def xx delta-es)
         (if (>= 0 delta-es) 0
             (abs (log delta-es))))))
 
